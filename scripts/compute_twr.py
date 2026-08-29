@@ -335,6 +335,45 @@ for ds in ddates:
     last_ci = ci_by_date.get(ds, last_ci)
     dref.append(last_ci)
 
+# ---------------- rolling 12-month TWR vs NDX, and XIRR ----------------
+def close_asof(cd, d, back=10):
+    for k in range(back):
+        v = cd.get(date.fromordinal(d.toordinal() - k).isoformat())
+        if v:
+            return v
+    return None
+
+cdd_dates = [date.fromisoformat(x) for x in cdates]
+roll, roll_bench = [], []
+j = 0
+for i, d in enumerate(cdd_dates):
+    cutoff = date.fromordinal(d.toordinal() - 365)
+    if cutoff < cdd_dates[0]:
+        roll.append(None)
+        roll_bench.append(None)
+        continue
+    while j + 1 <= i and cdd_dates[j + 1] <= cutoff:
+        j += 1
+    roll.append(round((cindex[i] / cindex[j] - 1) * 100, 2))
+    b0_, b1_ = close_asof(ndx_close, cutoff), close_asof(ndx_close, d)
+    roll_bench.append(round((b1_ / b0_ - 1) * 100, 2) if b0_ and b1_ else None)
+
+def xirr(flows):
+    t0 = flows[0][0]
+    def npv(r):
+        return sum(a / (1 + r) ** ((d - t0).days / 365.25) for d, a in flows)
+    lo, hi = -0.95, 5.0
+    for _ in range(200):
+        mid = (lo + hi) / 2
+        if npv(lo) * npv(mid) <= 0:
+            hi = mid
+        else:
+            lo = mid
+    return mid
+
+xf = sorted([(k, -v) for k, v in c_flow.items() if abs(v) > 0.01] + [(days[-1], nav[days[-1]])])
+xirr_pct = round(xirr(xf) * 100, 2)
+
 out = {
     "asof": days[-1].isoformat(),
     "validation": validation,
@@ -344,6 +383,7 @@ out = {
     "cfinal": round(cindex[-1], 2), "cmax_dd": round(min(cdd), 2),
     "ddates": ddates, "deploy": deploy_index, "ndx_matched": ndx_matched_index,
     "dholdings": dholdings, "dref": dref,
+    "roll": roll, "roll_bench": roll_bench, "xirr": xirr_pct,
 }
 json.dump(out, open(rf"{DATA}\twr_data.json", "w"))
 print("validation:", [(v["year"], v["diff"]) for v in validation])

@@ -75,6 +75,16 @@
 
   <div class="panel active" id="panel-us">
     <div class="tiles" id="us-tiles"></div>
+    <div class="card" id="us-card-roll">
+      <h2>Rolling 12 個月 TWR vs NDX</h2>
+      <p class="desc">每一天回看過去 365 天的報酬,舊資料會滾出視窗——這是「現在的你」的計分板。藍在灰上 = 最近一年贏指數。</p>
+      <div id="us-chart-roll"></div>
+      <div class="legend">
+        <span><span class="key" style="background:var(--series-1)"></span>近 12 個月 TWR</span>
+        <span><span class="key" style="background:var(--ink-muted)"></span>NDX 同期</span>
+      </div>
+      <div class="tooltip" id="us-tip-roll"></div>
+    </div>
     <div class="card" id="us-card-index">
       <h2>淨值指數(總資產)</h2>
       <p class="desc">日/月報酬連乘,100 = 2022 年 5 月 Firstrade 開帳。▲ 入金 ▼ 出金(僅標時點;2024/6 的 FT→IB 轉帳為內部移轉,不標)。NDX 為價格指數(不含股息),同日 rebase 至 100。2022/5–2023/7 為月結單月頻資料,月內波動不可見。</p>
@@ -118,6 +128,16 @@
 
   <div class="panel" id="panel-tw">
     <div class="tiles" id="tw-tiles"></div>
+    <div class="card" id="tw-card-roll">
+      <h2>Rolling 12 個月 TWR vs 0050</h2>
+      <p class="desc">每一天回看過去 365 天的報酬,舊資料會滾出視窗——這是「現在的你」的計分板。藍在灰上 = 最近一年贏指數。</p>
+      <div id="tw-chart-roll"></div>
+      <div class="legend">
+        <span><span class="key" style="background:var(--series-1)"></span>近 12 個月 TWR</span>
+        <span><span class="key" style="background:var(--ink-muted)"></span>0050 同期</span>
+      </div>
+      <div class="tooltip" id="tw-tip-roll"></div>
+    </div>
     <div class="card" id="tw-card-index">
       <h2>淨值指數(持倉部位)vs 0050</h2>
       <p class="desc">日報酬連乘,100 = 2019 年 1 月首筆交易。0050 同日 rebase 至 100,兩邊皆不含息。配股/拆分/減資以還原基準自動調整;未含現金股利與手續費(估計低估報酬 1-3%/年)。空手期間指數走平。</p>
@@ -241,21 +261,10 @@ function tiles(elId, items) {
     `<div class="tile"><div class="lbl">${t[0]}</div><div class="val">${t[1]}</div><div class="note">${t[2]}</div></div>`).join("");
 }
 
-function statTiles(elId, dts, finalV, maxDD, curDD, peakNote) {
-  const total = finalV - 100;
-  const yrs = (new Date(dts[dts.length - 1]) - new Date(dts[0])) / 86400000 / 365.25;
-  const cagr = (Math.pow(finalV / 100, 1 / yrs) - 1) * 100;
-  tiles(elId, [
-    ["總報酬 (TWR)", (total >= 0 ? "+" : "") + total.toFixed(1) + "%", dts[0] + " 起"],
-    ["年化報酬", (cagr >= 0 ? "+" : "") + cagr.toFixed(1) + "%", yrs.toFixed(1) + " 年"],
-    ["最大回撤", maxDD.toFixed(1) + "%", peakNote],
-    ["目前回撤", curDD.toFixed(1) + "%", "截至 " + dts[dts.length - 1]],
-  ]);
-}
-
 function lineChart(opts) {
-  // opts: chartEl, cardId, tipId, dts, series [{arr, stroke, width, opacity, dash}], flows, baseLine, tooltip(i, Y)
+  // opts: chartEl, cardId, tipId, dts, series [{arr, stroke, width, opacity, dash}], flows, baseline, tooltip(i, Y)
   const H = opts.H || 380, MB = 26;
+  const baseline = opts.baseline ?? 100;
   const sc = mkScale(opts.dts);
   const all = opts.series.flatMap(s => s.arr.filter(v => v != null));
   const vmin = Math.min(...all), vmax = Math.max(...all);
@@ -286,7 +295,7 @@ function lineChart(opts) {
   document.getElementById(opts.chartEl).innerHTML =
     `<svg viewBox="0 0 ${W} ${H}" role="img">
       ${gridAndAxis(sc, H, MB, yTicks, v => v)}
-      <line x1="${ML}" x2="${W - MR}" y1="${Y(100)}" y2="${Y(100)}" stroke="var(--axis)" stroke-width="1" stroke-dasharray="4 3"/>
+      <line x1="${ML}" x2="${W - MR}" y1="${Y(baseline)}" y2="${Y(baseline)}" stroke="var(--axis)" stroke-width="1" stroke-dasharray="4 3"/>
       ${paths}${flows}
       <line class="crosshair" y1="${MT}" y2="${H - MB}" stroke="var(--ink-muted)" stroke-width="1" style="display:none"/>
       <circle class="hoverdot" r="4" fill="var(--series-1)" stroke="var(--surface-1)" stroke-width="2" style="display:none"/>
@@ -366,7 +375,31 @@ function ddTable(tableId, eps) {
 }
 
 // ================= US panel =================
-statTiles("us-tiles", US.cdates, US.cfinal, US.cmax_dd, US.cdd[US.cdd.length - 1], US.ctop_dd[0].peak + " 高點起");
+const pct = v => (v >= 0 ? "+" : "") + v.toFixed(1) + "%";
+const lastNonNull = a => a.filter(v => v != null).slice(-1)[0];
+
+tiles("us-tiles", [
+  ["近 12 個月 TWR", pct(lastNonNull(US.roll)), "NDX 同期 " + pct(lastNonNull(US.roll_bench))],
+  ["金額加權年化 (XIRR)", pct(US.xirr) + "/yr", "以實際出入金計"],
+  ["總報酬 (since 2022/5)", pct(US.cfinal - 100), "TWR,歷史全紀錄"],
+  ["目前回撤", US.cdd[US.cdd.length - 1].toFixed(1) + "%", "距 " + US.ctop_dd[0].peak + " 高點"],
+]);
+lineChart({
+  chartEl: "us-chart-roll", cardId: "us-card-roll", tipId: "us-tip-roll",
+  dts: US.cdates, H: 320, baseline: 0,
+  series: [
+    { arr: US.roll_bench, stroke: "var(--ink-muted)", width: 1.5, opacity: 0.75 },
+    { arr: US.roll, stroke: "var(--series-1)", width: 2 },
+  ],
+  tooltip: (i, Y) => {
+    const v = US.roll[i], b = US.roll_bench[i];
+    if (v == null) return [Y(0), `<div class="t-date">${US.cdates[i]}</div><div class="t-val">未滿一年</div>`];
+    const gap = b != null ? v - b : null;
+    return [Y(v), `<div class="t-date">${US.cdates[i]}</div><div class="t-val">近一年 ${pct(v)}</div>` +
+      (b != null ? `<div style="color:var(--ink-2)">NDX 同期 ${pct(b)}</div>` : "") +
+      (gap != null ? `<div style="color:var(--ink-2)">差距 ${pct(gap)}</div>` : "")];
+  },
+});
 lineChart({
   chartEl: "us-chart-index", cardId: "us-card-index", tipId: "us-tip-index",
   dts: US.cdates, flows: US.cflows,
@@ -403,7 +436,28 @@ heatmap("us-chart-heat", US.cmonthly);
 ddTable("us-dd-table", US.ctop_dd);
 
 // ================= TW panel =================
-statTiles("tw-tiles", TW.dates, TW.final, TW.max_dd, TW.drawdown[TW.drawdown.length - 1], TW.top_dd[0].peak + " 高點起");
+tiles("tw-tiles", [
+  ["近 12 個月 TWR", pct(lastNonNull(TW.roll)), "0050 同期 " + pct(lastNonNull(TW.roll_bench))],
+  ["金額加權年化 (XIRR)", pct(TW.xirr) + "/yr", "以逐筆買賣現金流計"],
+  ["總報酬 (since 2019/1)", pct(TW.final - 100), "TWR,歷史全紀錄"],
+  ["目前回撤", TW.drawdown[TW.drawdown.length - 1].toFixed(1) + "%", "距 " + TW.top_dd[0].peak + " 高點"],
+]);
+lineChart({
+  chartEl: "tw-chart-roll", cardId: "tw-card-roll", tipId: "tw-tip-roll",
+  dts: TW.dates, H: 320, baseline: 0,
+  series: [
+    { arr: TW.roll_bench, stroke: "var(--ink-muted)", width: 1.5, opacity: 0.75 },
+    { arr: TW.roll, stroke: "var(--series-1)", width: 2 },
+  ],
+  tooltip: (i, Y) => {
+    const v = TW.roll[i], b = TW.roll_bench[i];
+    if (v == null) return [Y(0), `<div class="t-date">${TW.dates[i]}</div><div class="t-val">未滿一年</div>`];
+    const gap = b != null ? v - b : null;
+    return [Y(v), `<div class="t-date">${TW.dates[i]}</div><div class="t-val">近一年 ${pct(v)}</div>` +
+      (b != null ? `<div style="color:var(--ink-2)">0050 同期 ${pct(b)}</div>` : "") +
+      (gap != null ? `<div style="color:var(--ink-2)">差距 ${pct(gap)}</div>` : "")];
+  },
+});
 lineChart({
   chartEl: "tw-chart-index", cardId: "tw-card-index", tipId: "tw-tip-index",
   dts: TW.dates,

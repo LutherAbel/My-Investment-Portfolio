@@ -144,8 +144,49 @@ for p_, t_, rcv in eps:
     })
 top.sort(key=lambda e: e["depth"])
 
+# rolling 12-month TWR vs 0050, and XIRR
+cal_d = [date.fromisoformat(x) for x in dates]
+b_close = prices["0050"]["close"]
+def close_asof(cd, d, back=10):
+    for k in range(back):
+        v = cd.get(date.fromordinal(d.toordinal() - k).isoformat())
+        if v:
+            return v
+    return None
+
+roll, roll_bench = [], []
+j = 0
+for i, d in enumerate(cal_d):
+    cutoff = date.fromordinal(d.toordinal() - 365)
+    if cutoff < cal_d[0]:
+        roll.append(None)
+        roll_bench.append(None)
+        continue
+    while j + 1 <= i and cal_d[j + 1] <= cutoff:
+        j += 1
+    roll.append(round((index_vals[i] / index_vals[j] - 1) * 100, 2))
+    b0_, b1_ = close_asof(b_close, cutoff), close_asof(b_close, d)
+    roll_bench.append(round((b1_ / b0_ - 1) * 100, 2) if b0_ and b1_ else None)
+
+def xirr(flows):
+    t0 = flows[0][0]
+    def npv(r):
+        return sum(a / (1 + r) ** ((d - t0).days / 365.25) for d, a in flows)
+    lo, hi = -0.95, 5.0
+    for _ in range(200):
+        mid = (lo + hi) / 2
+        if npv(lo) * npv(mid) <= 0:
+            hi = mid
+        else:
+            lo = mid
+    return mid
+
+xf = sorted([(d, -money) for d, _, _, _, money in trades] + [(cal_d[-1], prev_mv)])
+xirr_pct = round(xirr(xf) * 100, 2)
+
 out = {
     "asof": dates[-1],
+    "roll": roll, "roll_bench": roll_bench, "xirr": xirr_pct,
     "dates": dates, "index": index_vals, "bench": bench_vals,
     "bench_matched": bench_matched, "drawdown": dd_vals,
     "holdings": holdings_by_day, "monthly": monthly_out, "top_dd": top[:5],
