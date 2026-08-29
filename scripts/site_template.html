@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>交易淨值回顧</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1: #fcfcfb; --page: #f9f9f7;
+    --ink-1: #0b0b0b; --ink-2: #52514e; --ink-muted: #898781;
+    --grid: #e1e0d9; --axis: #c3c2b7;
+    --series-1: #2a78d6; --dd-red: #e34948;
+    --pos: #2a78d6; --neg: #e34948; --mid: #f0efec;
+    --flow-in: #1baf7a; --flow-out: #eda100;
+    --border: rgba(11,11,11,0.10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --surface-1: #1a1a19; --page: #0d0d0d;
+      --ink-1: #ffffff; --ink-2: #c3c2b7; --ink-muted: #898781;
+      --grid: #2c2c2a; --axis: #383835;
+      --series-1: #3987e5; --dd-red: #e66767;
+      --pos: #3987e5; --neg: #e66767; --mid: #383835;
+      --flow-in: #199e70; --flow-out: #c98500;
+      --border: rgba(255,255,255,0.10);
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px 16px 48px; background: var(--page); color: var(--ink-1);
+         font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { max-width: 960px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--ink-2); font-size: 13px; margin-bottom: 16px; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--grid); }
+  .tab { padding: 8px 18px; font-size: 14px; cursor: pointer; border: none; background: none;
+         color: var(--ink-2); border-bottom: 2px solid transparent; font-family: inherit; }
+  .tab.active { color: var(--ink-1); font-weight: 650; border-bottom-color: var(--series-1); }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .tile .lbl { font-size: 12px; color: var(--ink-2); margin-bottom: 4px; }
+  .tile .val { font-size: 24px; font-weight: 650; }
+  .tile .note { font-size: 11px; color: var(--ink-muted); margin-top: 2px; }
+  .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+          padding: 16px; margin-bottom: 20px; position: relative; }
+  .card h2 { font-size: 14px; margin: 0 0 2px; }
+  .card .desc { font-size: 12px; color: var(--ink-2); margin: 0 0 10px; }
+  svg { display: block; width: 100%; height: auto; }
+  .tooltip { position: absolute; pointer-events: none; display: none; background: var(--surface-1);
+             border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+             padding: 8px 10px; font-size: 12px; z-index: 5; min-width: 130px; }
+  .tooltip .t-date { color: var(--ink-2); margin-bottom: 2px; }
+  .tooltip .t-val { font-weight: 650; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: right; padding: 7px 10px; border-bottom: 1px solid var(--grid); }
+  th { color: var(--ink-2); font-weight: 550; font-size: 12px; }
+  th:first-child, td:first-child { text-align: left; }
+  td { font-variant-numeric: tabular-nums; }
+  .neg-txt { color: var(--neg); font-weight: 600; }
+  .legend { display: flex; gap: 16px; font-size: 12px; color: var(--ink-2); margin-top: 8px; flex-wrap: wrap; }
+  .legend .key { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>交易淨值回顧(TWR 指數)</h1>
+  <div class="sub" id="subline"></div>
+  <div class="tabs">
+    <button class="tab active" data-panel="us">美股(FT + IB)</button>
+    <button class="tab" data-panel="tw">台股</button>
+  </div>
+
+  <div class="panel active" id="panel-us">
+    <div class="tiles" id="us-tiles"></div>
+    <div class="card" id="us-card-index">
+      <h2>淨值指數(總資產)</h2>
+      <p class="desc">日/月報酬連乘,100 = 2022 年 5 月 Firstrade 開帳。▲ 入金 ▼ 出金(僅標時點;2024/6 的 FT→IB 轉帳為內部移轉,不標)。NDX 為價格指數(不含股息),同日 rebase 至 100。2022/5–2023/7 為月結單月頻資料,月內波動不可見。</p>
+      <div id="us-chart-index"></div>
+      <div class="legend">
+        <span><span class="key" style="background:var(--series-1)"></span>TWR 指數</span>
+        <span><span class="key" style="background:var(--ink-muted)"></span>NDX(rebased)</span>
+        <span><span class="key" style="background:var(--flow-in)"></span>入金時點</span>
+        <span><span class="key" style="background:var(--flow-out)"></span>出金時點</span>
+      </div>
+      <div class="tooltip" id="us-tip-index"></div>
+    </div>
+    <div class="card" id="us-card-deploy">
+      <h2>進場資金 vs NDX(同進出場時點,2022/5 起)</h2>
+      <p class="desc">只看放進市場的錢:買股即計入、賣回現金即停止計算,兩帳戶合併。灰線 = 同樣的進出場時點改買 NDX(做空期間灰線照漲,那正是做空的機會成本)。兩線差距 = 選股;藍實線與淡虛線(全帳戶 TWR)差距 = 現金拖累與進出場時機。近似值:未含手續費(高估)與股息(低估);美國國債持有期間以成本計價。</p>
+      <div id="us-chart-deploy"></div>
+      <div class="legend">
+        <span><span class="key" style="background:var(--series-1)"></span>進場資金指數</span>
+        <span><span class="key" style="background:var(--ink-muted)"></span>NDX(同步進出)</span>
+        <span><span class="key" style="background:var(--series-1);opacity:.35"></span>全帳戶 TWR</span>
+      </div>
+      <div class="tooltip" id="us-tip-deploy"></div>
+    </div>
+    <div class="card" id="us-card-dd">
+      <h2>水下圖(距歷史高點回撤)</h2>
+      <p class="desc">距離指數歷史高點的百分比。0 = 創新高。2022-2023 月頻段的月內回撤看不到,實際可能更深。</p>
+      <div id="us-chart-dd"></div>
+      <div class="tooltip" id="us-tip-dd"></div>
+    </div>
+    <div class="card">
+      <h2>月報酬熱力圖</h2>
+      <p class="desc">各月 TWR 報酬(%)。藍 = 正、紅 = 負。無結單的月份(2022/7-8、2023/12、2024/5 等)報酬併入下一個有節點的月份。</p>
+      <div id="us-chart-heat"></div>
+    </div>
+    <div class="card">
+      <h2>五大回撤事件</h2>
+      <p class="desc">依深度排序。「回復」= 指數重回前高的日期;修復天數 = 高點到回復的總天數。</p>
+      <table id="us-dd-table"><thead><tr><th>#</th><th>深度</th><th>高點日</th><th>谷底日</th><th>回復日</th><th>下跌天數</th><th>修復天數</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+
+  <div class="panel" id="panel-tw">
+    <div class="tiles" id="tw-tiles"></div>
+    <div class="card" id="tw-card-index">
+      <h2>淨值指數(持倉部位)vs 0050</h2>
+      <p class="desc">日報酬連乘,100 = 2019 年 1 月首筆交易。0050 同日 rebase 至 100,兩邊皆不含息。配股/拆分/減資以還原基準自動調整;未含現金股利與手續費(估計低估報酬 1-3%/年)。空手期間指數走平。</p>
+      <div id="tw-chart-index"></div>
+      <div class="legend">
+        <span><span class="key" style="background:var(--series-1)"></span>TWR 指數</span>
+        <span><span class="key" style="background:var(--ink-muted)"></span>0050(rebased)</span>
+      </div>
+      <div class="tooltip" id="tw-tip-index"></div>
+    </div>
+    <div class="card" id="tw-card-dd">
+      <h2>水下圖(距歷史高點回撤)</h2>
+      <p class="desc">距離指數歷史高點的百分比。0 = 創新高。</p>
+      <div id="tw-chart-dd"></div>
+      <div class="tooltip" id="tw-tip-dd"></div>
+    </div>
+    <div class="card">
+      <h2>月報酬熱力圖</h2>
+      <p class="desc">各月 TWR 報酬(%)。藍 = 正、紅 = 負。</p>
+      <div id="tw-chart-heat"></div>
+    </div>
+    <div class="card">
+      <h2>五大回撤事件</h2>
+      <p class="desc">依深度排序。「回復」= 指數重回前高的日期;修復天數 = 高點到回復的總天數。</p>
+      <table id="tw-dd-table"><thead><tr><th>#</th><th>深度</th><th>高點日</th><th>谷底日</th><th>回復日</th><th>下跌天數</th><th>修復天數</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+</div>
+
+<script>
+const US = __DATA_US__;
+const TW = __DATA_TW__;
+
+document.getElementById("subline").textContent =
+  `美股資料截至 ${US.asof}(IB 段已對帳官方年度 TWR,誤差 < 0.001%)・ 台股資料截至 ${TW.asof}(近似值,不含現金股利)・ 出入金影響已剔除(時間加權)`;
+
+// ---------- tabs ----------
+document.querySelectorAll(".tab").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
+  document.querySelectorAll(".panel").forEach(x => x.classList.remove("active"));
+  b.classList.add("active");
+  document.getElementById("panel-" + b.dataset.panel).classList.add("active");
+  try { localStorage.setItem("trades-tab", b.dataset.panel); } catch (e) {}
+}));
+try {
+  const saved = localStorage.getItem("trades-tab");
+  if (saved) document.querySelector(`.tab[data-panel="${saved}"]`)?.click();
+} catch (e) {}
+
+// ---------- shared chart helpers ----------
+const W = 920, ML = 46, MR = 14, MT = 10;
+const fmt2 = x => x.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+function mkScale(datesArr) {
+  const t0 = new Date(datesArr[0]).getTime(), t1 = new Date(datesArr[datesArr.length - 1]).getTime();
+  const X = i => ML + (new Date(datesArr[i]).getTime() - t0) / (t1 - t0) * (W - ML - MR);
+  const y0 = new Date(datesArr[0]).getFullYear() + 1, y1 = new Date(datesArr[datesArr.length - 1]).getFullYear();
+  const ticks = [];
+  for (let y = y0; y <= y1; y++) {
+    const t = new Date(y + "-01-01").getTime();
+    ticks.push({ x: ML + (t - t0) / (t1 - t0) * (W - ML - MR), label: String(y) });
+  }
+  return { X, ticks, n: datesArr.length };
+}
+
+function gridAndAxis(scale, H, MB, yTicks, yFmt) {
+  let g = "";
+  for (const t of yTicks) {
+    g += `<line x1="${ML}" x2="${W - MR}" y1="${t.y}" y2="${t.y}" stroke="var(--grid)" stroke-width="1"/>`;
+    g += `<text x="${ML - 8}" y="${t.y + 4}" text-anchor="end" font-size="11" fill="var(--ink-muted)">${yFmt(t.v)}</text>`;
+  }
+  for (const t of scale.ticks) {
+    g += `<line x1="${t.x}" x2="${t.x}" y1="${MT}" y2="${H - MB}" stroke="var(--grid)" stroke-width="1" stroke-dasharray="2 3"/>`;
+    g += `<text x="${t.x + 4}" y="${H - MB + 16}" font-size="11" fill="var(--ink-muted)">${t.label}</text>`;
+  }
+  g += `<line x1="${ML}" x2="${W - MR}" y1="${H - MB}" y2="${H - MB}" stroke="var(--axis)" stroke-width="1"/>`;
+  return g;
+}
+
+function attachHover(cardId, tipId, scale, H, valueAt) {
+  const card = document.getElementById(cardId);
+  const svg = card.querySelector("svg");
+  const tip = document.getElementById(tipId);
+  const cross = svg.querySelector(".crosshair");
+  const dot = svg.querySelector(".hoverdot");
+  svg.addEventListener("mousemove", e => {
+    const r = svg.getBoundingClientRect();
+    const px = (e.clientX - r.left) * W / r.width;
+    let lo = 0, hi = scale.n - 1;
+    while (hi - lo > 1) { const m = (lo + hi) >> 1; (scale.X(m) < px) ? lo = m : hi = m; }
+    const i = (px - scale.X(lo) < scale.X(hi) - px) ? lo : hi;
+    const [y, html] = valueAt(i);
+    cross.setAttribute("x1", scale.X(i)); cross.setAttribute("x2", scale.X(i));
+    cross.style.display = "block";
+    dot.setAttribute("cx", scale.X(i)); dot.setAttribute("cy", y);
+    dot.style.display = "block";
+    tip.innerHTML = html;
+    tip.style.display = "block";
+    const cardR = card.getBoundingClientRect();
+    let tx = (scale.X(i) / W) * r.width + (r.left - cardR.left) + 14;
+    if (tx > cardR.width - 200) tx -= 240;
+    tip.style.left = tx + "px";
+    tip.style.top = ((y / H) * r.height + (r.top - cardR.top) - 20) + "px";
+  });
+  svg.addEventListener("mouseleave", () => {
+    tip.style.display = "none"; cross.style.display = "none"; dot.style.display = "none";
+  });
+}
+
+function pathOf(arr, scale, Y) {
+  let p = "";
+  for (let i = 0; i < arr.length; i++) {
+    if (arr[i] == null) continue;
+    p += (p ? "L" : "M") + scale.X(i).toFixed(1) + " " + Y(arr[i]).toFixed(1);
+  }
+  return p;
+}
+
+function tiles(elId, items) {
+  document.getElementById(elId).innerHTML = items.map(t =>
+    `<div class="tile"><div class="lbl">${t[0]}</div><div class="val">${t[1]}</div><div class="note">${t[2]}</div></div>`).join("");
+}
+
+function statTiles(elId, dts, finalV, maxDD, curDD, peakNote) {
+  const total = finalV - 100;
+  const yrs = (new Date(dts[dts.length - 1]) - new Date(dts[0])) / 86400000 / 365.25;
+  const cagr = (Math.pow(finalV / 100, 1 / yrs) - 1) * 100;
+  tiles(elId, [
+    ["總報酬 (TWR)", (total >= 0 ? "+" : "") + total.toFixed(1) + "%", dts[0] + " 起"],
+    ["年化報酬", (cagr >= 0 ? "+" : "") + cagr.toFixed(1) + "%", yrs.toFixed(1) + " 年"],
+    ["最大回撤", maxDD.toFixed(1) + "%", peakNote],
+    ["目前回撤", curDD.toFixed(1) + "%", "截至 " + dts[dts.length - 1]],
+  ]);
+}
+
+function lineChart(opts) {
+  // opts: chartEl, cardId, tipId, dts, series [{arr, stroke, width, opacity, dash}], flows, baseLine, tooltip(i, Y)
+  const H = opts.H || 380, MB = 26;
+  const sc = mkScale(opts.dts);
+  const all = opts.series.flatMap(s => s.arr.filter(v => v != null));
+  const vmin = Math.min(...all), vmax = Math.max(...all);
+  const pad = (vmax - vmin) * 0.06;
+  const lo = Math.floor((vmin - pad) / 10) * 10, hi = Math.ceil((vmax + pad) / 10) * 10;
+  const Y = v => MT + (hi - v) / (hi - lo) * (H - MT - MB);
+  const step = (hi - lo) > 300 ? 50 : (hi - lo) > 90 ? 20 : 10;
+  const yTicks = [];
+  for (let v = lo; v <= hi; v += step) yTicks.push({ v, y: Y(v) });
+
+  let flows = "";
+  for (const f of (opts.flows || [])) {
+    const i = opts.dts.indexOf(f.date);
+    if (i < 0) continue;
+    const x = sc.X(i), yv = Y(f.index);
+    const isIn = f.amount > 0;
+    const y = isIn ? yv + 14 : yv - 14;
+    const pts = isIn ? `${x},${y - 5} ${x - 5},${y + 4} ${x + 5},${y + 4}`
+                     : `${x},${y + 5} ${x - 5},${y - 4} ${x + 5},${y - 4}`;
+    flows += `<polygon points="${pts}" fill="var(--flow-${isIn ? "in" : "out"})" stroke="var(--surface-1)" stroke-width="1.5">` +
+             `<title>${f.date} ${isIn ? "入金" : "出金"} ${fmt2(Math.abs(f.amount))} USD</title></polygon>`;
+  }
+
+  const paths = opts.series.map(s =>
+    `<path d="${pathOf(s.arr, sc, Y)}" fill="none" stroke="${s.stroke}" stroke-width="${s.width || 2}"` +
+    ` opacity="${s.opacity ?? 1}"${s.dash ? ` stroke-dasharray="${s.dash}"` : ""} stroke-linejoin="round"/>`).join("");
+
+  document.getElementById(opts.chartEl).innerHTML =
+    `<svg viewBox="0 0 ${W} ${H}" role="img">
+      ${gridAndAxis(sc, H, MB, yTicks, v => v)}
+      <line x1="${ML}" x2="${W - MR}" y1="${Y(100)}" y2="${Y(100)}" stroke="var(--axis)" stroke-width="1" stroke-dasharray="4 3"/>
+      ${paths}${flows}
+      <line class="crosshair" y1="${MT}" y2="${H - MB}" stroke="var(--ink-muted)" stroke-width="1" style="display:none"/>
+      <circle class="hoverdot" r="4" fill="var(--series-1)" stroke="var(--surface-1)" stroke-width="2" style="display:none"/>
+    </svg>`;
+  attachHover(opts.cardId, opts.tipId, sc, H, i => opts.tooltip(i, Y));
+}
+
+function underwaterChart(opts) {
+  // opts: chartEl, cardId, tipId, dts, dd, holdings?
+  const H = 240, MB = 26;
+  const sc = mkScale(opts.dts);
+  const dmin = Math.floor(Math.min(...opts.dd) / 5) * 5;
+  const Y = v => MT + (0 - v) / (0 - dmin) * (H - MT - MB);
+  const yTicks = [];
+  const step = dmin < -50 ? 20 : 10;
+  for (let v = 0; v >= dmin; v -= step) yTicks.push({ v, y: Y(v) });
+  let area = `M${sc.X(0).toFixed(1)} ${Y(0).toFixed(1)}`;
+  for (let i = 0; i < sc.n; i++) area += `L${sc.X(i).toFixed(1)} ${Y(opts.dd[i]).toFixed(1)}`;
+  area += `L${sc.X(sc.n - 1).toFixed(1)} ${Y(0).toFixed(1)}Z`;
+  document.getElementById(opts.chartEl).innerHTML =
+    `<svg viewBox="0 0 ${W} ${H}" role="img">
+      ${gridAndAxis(sc, H, MB, yTicks, v => v + "%")}
+      <path d="${area}" fill="var(--dd-red)" opacity="0.16"/>
+      <path d="${pathOf(opts.dd, sc, Y)}" fill="none" stroke="var(--dd-red)" stroke-width="2" stroke-linejoin="round"/>
+      <line class="crosshair" y1="${MT}" y2="${H - MB}" stroke="var(--ink-muted)" stroke-width="1" style="display:none"/>
+      <circle class="hoverdot" r="4" fill="var(--dd-red)" stroke="var(--surface-1)" stroke-width="2" style="display:none"/>
+    </svg>`;
+  attachHover(opts.cardId, opts.tipId, sc, H, i => {
+    const v = opts.dd[i];
+    let html = `<div class="t-date">${opts.dts[i]}</div><div class="t-val neg-txt">${v.toFixed(1)}%</div>`;
+    if (opts.holdings) html += `<div style="color:var(--ink-2);margin-top:4px;max-width:250px;line-height:1.5">持倉:${opts.holdings[i] || "(空手)"}</div>`;
+    return [Y(v), html];
+  });
+}
+
+function heatmap(elId, monthly) {
+  const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  const years = [...new Set(monthly.map(m => m.y))];
+  const cellW = 66, cellH = 38, left = 52, top = 26;
+  const Wh = left + 12 * cellW + 10, Hh = top + years.length * cellH + 8;
+  const byYM = {};
+  for (const m of monthly) byYM[m.y + "-" + m.m] = m.ret;
+  const amax = Math.max(...monthly.map(m => Math.abs(m.ret)));
+  const hex = c => { const n = parseInt(c.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+  function cellColor(v) {
+    const t = Math.min(Math.abs(v) / amax, 1);
+    const a = hex(css("--mid")), b = hex(css(v >= 0 ? "--pos" : "--neg"));
+    return `rgb(${a.map((x, i) => Math.round(x + (b[i] - x) * t)).join(",")})`;
+  }
+  let g = "";
+  for (let m = 1; m <= 12; m++)
+    g += `<text x="${left + (m - 0.5) * cellW}" y="${top - 8}" text-anchor="middle" font-size="11" fill="var(--ink-muted)">${m}月</text>`;
+  years.forEach((y, r) => {
+    g += `<text x="${left - 10}" y="${top + r * cellH + cellH / 2 + 4}" text-anchor="end" font-size="12" fill="var(--ink-2)">${y}</text>`;
+    for (let m = 1; m <= 12; m++) {
+      const v = byYM[y + "-" + m];
+      const x = left + (m - 1) * cellW, yy = top + r * cellH;
+      if (v === undefined) {
+        g += `<rect x="${x + 1}" y="${yy + 1}" width="${cellW - 2}" height="${cellH - 2}" rx="6" fill="none" stroke="var(--grid)"/>`;
+        continue;
+      }
+      const ink = Math.abs(v) / amax > 0.55 ? "#ffffff" : "var(--ink-1)";
+      g += `<rect x="${x + 1}" y="${yy + 1}" width="${cellW - 2}" height="${cellH - 2}" rx="6" fill="${cellColor(v)}">` +
+           `<title>${y}/${m}: ${v >= 0 ? "+" : ""}${v.toFixed(2)}%</title></rect>` +
+           `<text x="${x + cellW / 2}" y="${yy + cellH / 2 + 4}" text-anchor="middle" font-size="11" fill="${ink}">${v >= 0 ? "+" : ""}${v.toFixed(1)}</text>`;
+    }
+  });
+  document.getElementById(elId).innerHTML =
+    `<div style="overflow-x:auto"><svg viewBox="0 0 ${Wh} ${Hh}" style="min-width:760px" role="img">${g}</svg></div>`;
+}
+
+function ddTable(tableId, eps) {
+  document.querySelector(`#${tableId} tbody`).innerHTML = eps.map((e, i) =>
+    `<tr><td>${i + 1}</td><td class="neg-txt">${e.depth.toFixed(1)}%</td>` +
+    `<td>${e.peak}</td><td>${e.trough}</td><td>${e.recovered ?? "尚未回復"}</td>` +
+    `<td>${e.days_down}</td><td>${e.days_total ?? "—"}</td></tr>`).join("");
+}
+
+// ================= US panel =================
+statTiles("us-tiles", US.cdates, US.cfinal, US.cmax_dd, US.cdd[US.cdd.length - 1], US.ctop_dd[0].peak + " 高點起");
+lineChart({
+  chartEl: "us-chart-index", cardId: "us-card-index", tipId: "us-tip-index",
+  dts: US.cdates, flows: US.cflows,
+  series: [
+    { arr: US.cndx, stroke: "var(--ink-muted)", width: 1.5, opacity: 0.75 },
+    { arr: US.cindex, stroke: "var(--series-1)", width: 2 },
+  ],
+  tooltip: (i, Y) => {
+    const v = US.cindex[i], ret = (v / 100 - 1) * 100, ndx = US.cndx[i];
+    return [Y(v), `<div class="t-date">${US.cdates[i]}</div><div class="t-val">指數 ${v.toFixed(1)}</div>` +
+      `<div style="color:var(--ink-2)">累積 ${(ret >= 0 ? "+" : "") + ret.toFixed(1)}%</div>` +
+      (ndx != null ? `<div style="color:var(--ink-2)">NDX ${ndx.toFixed(1)}</div>` : "") +
+      `<div style="color:var(--ink-2);margin-top:4px;max-width:230px;line-height:1.5">持倉:${US.choldings[i] || "(空手)"}</div>`];
+  },
+});
+lineChart({
+  chartEl: "us-chart-deploy", cardId: "us-card-deploy", tipId: "us-tip-deploy",
+  dts: US.ddates, H: 340,
+  series: [
+    { arr: US.dref, stroke: "var(--series-1)", width: 1.5, opacity: 0.35, dash: "5 4" },
+    { arr: US.ndx_matched, stroke: "var(--ink-muted)", width: 1.5, opacity: 0.85 },
+    { arr: US.deploy, stroke: "var(--series-1)", width: 2 },
+  ],
+  tooltip: (i, Y) => {
+    const dv = US.deploy[i], nv = US.ndx_matched[i], gap = dv - nv;
+    return [Y(dv), `<div class="t-date">${US.ddates[i]}</div><div class="t-val">進場資金 ${dv.toFixed(1)}</div>` +
+      `<div style="color:var(--ink-2)">NDX 同步 ${nv.toFixed(1)}</div>` +
+      `<div style="color:var(--ink-2)">選股差距 ${(gap >= 0 ? "+" : "") + gap.toFixed(1)}</div>` +
+      `<div style="color:var(--ink-2);margin-top:4px;max-width:230px;line-height:1.5">持倉:${US.dholdings[i] || "(空手)"}</div>`];
+  },
+});
+underwaterChart({ chartEl: "us-chart-dd", cardId: "us-card-dd", tipId: "us-tip-dd", dts: US.cdates, dd: US.cdd });
+heatmap("us-chart-heat", US.cmonthly);
+ddTable("us-dd-table", US.ctop_dd);
+
+// ================= TW panel =================
+statTiles("tw-tiles", TW.dates, TW.final, TW.max_dd, TW.drawdown[TW.drawdown.length - 1], TW.top_dd[0].peak + " 高點起");
+lineChart({
+  chartEl: "tw-chart-index", cardId: "tw-card-index", tipId: "tw-tip-index",
+  dts: TW.dates,
+  series: [
+    { arr: TW.bench, stroke: "var(--ink-muted)", width: 1.5, opacity: 0.75 },
+    { arr: TW.index, stroke: "var(--series-1)", width: 2 },
+  ],
+  tooltip: (i, Y) => {
+    const v = TW.index[i], ret = (v / 100 - 1) * 100, b = TW.bench[i];
+    return [Y(v), `<div class="t-date">${TW.dates[i]}</div><div class="t-val">指數 ${v.toFixed(1)}</div>` +
+      `<div style="color:var(--ink-2)">累積 ${(ret >= 0 ? "+" : "") + ret.toFixed(1)}%</div>` +
+      (b != null ? `<div style="color:var(--ink-2)">0050 ${b.toFixed(1)}</div>` : "") +
+      `<div style="color:var(--ink-2);margin-top:4px;max-width:250px;line-height:1.5">持倉:${TW.holdings[i] || "(空手)"}</div>`];
+  },
+});
+underwaterChart({ chartEl: "tw-chart-dd", cardId: "tw-card-dd", tipId: "tw-tip-dd", dts: TW.dates, dd: TW.drawdown, holdings: TW.holdings });
+heatmap("tw-chart-heat", TW.monthly);
+ddTable("tw-dd-table", TW.top_dd);
+</script>
+</body>
+</html>
