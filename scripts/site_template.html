@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="zh-Hant">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>交易淨值回顧</title>
+<title>Abel's Investment Portfolio</title>
 <style>
   :root {
     color-scheme: light;
@@ -31,8 +31,7 @@
   body { margin: 0; padding: 24px 16px 48px; background: var(--page); color: var(--ink-1);
          font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
   .wrap { max-width: 960px; margin: 0 auto; }
-  h1 { font-size: 20px; margin: 0 0 4px; }
-  .sub { color: var(--ink-2); font-size: 13px; margin-bottom: 16px; }
+  h1 { font-size: 20px; margin: 0 0 16px; }
   .tabs { display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--grid); }
   .tab { padding: 8px 18px; font-size: 14px; cursor: pointer; border: none; background: none;
          color: var(--ink-2); border-bottom: 2px solid transparent; font-family: inherit; }
@@ -46,8 +45,7 @@
   .tile .note { font-size: 11px; color: var(--ink-muted); margin-top: 2px; }
   .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
           padding: 16px; margin-bottom: 20px; position: relative; }
-  .card h2 { font-size: 14px; margin: 0 0 2px; }
-  .card .desc { font-size: 12px; color: var(--ink-2); margin: 0 0 10px; }
+  .card h2 { font-size: 14px; margin: 0 0 10px; }
   svg { display: block; width: 100%; height: auto; }
   .tooltip { position: absolute; pointer-events: none; display: none; background: var(--surface-1);
              border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.15);
@@ -66,103 +64,90 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>交易淨值回顧(TWR 指數)</h1>
-  <div class="sub" id="subline"></div>
+  <h1>Abel's Investment Portfolio</h1>
   <div class="tabs">
-    <button class="tab active" data-panel="us">美股(FT + IB)</button>
-    <button class="tab" data-panel="tw">台股</button>
+    <button class="tab active" data-panel="us">US</button>
+    <button class="tab" data-panel="tw">TW</button>
   </div>
 
   <div class="panel active" id="panel-us">
     <div class="tiles" id="us-tiles"></div>
     <div class="card" id="us-card-roll">
-      <h2>Rolling 12 個月 TWR vs NDX</h2>
-      <p class="desc">每一天回看過去 365 天的報酬,舊資料會滾出視窗——這是「現在的你」的計分板。藍在灰上 = 最近一年贏指數。</p>
+      <h2>Rolling 12-Month TWR vs NDX</h2>
       <div id="us-chart-roll"></div>
       <div class="legend">
-        <span><span class="key" style="background:var(--series-1)"></span>近 12 個月 TWR</span>
-        <span><span class="key" style="background:var(--ink-muted)"></span>NDX 同期</span>
+        <span><span class="key" style="background:var(--series-1)"></span>Trailing 12M TWR</span>
+        <span><span class="key" style="background:var(--ink-muted)"></span>NDX same window</span>
       </div>
       <div class="tooltip" id="us-tip-roll"></div>
     </div>
     <div class="card" id="us-card-index">
-      <h2>淨值指數(總資產)</h2>
-      <p class="desc">日/月報酬連乘,100 = 2022 年 5 月 Firstrade 開帳。▲ 入金 ▼ 出金(僅標時點;2024/6 的 FT→IB 轉帳為內部移轉,不標)。NDX 為價格指數(不含股息),同日 rebase 至 100。2022/5–2023/7 為月結單月頻資料,月內波動不可見。</p>
+      <h2>NAV Index vs NDX</h2>
       <div id="us-chart-index"></div>
       <div class="legend">
-        <span><span class="key" style="background:var(--series-1)"></span>TWR 指數</span>
-        <span><span class="key" style="background:var(--ink-muted)"></span>NDX(rebased)</span>
-        <span><span class="key" style="background:var(--flow-in)"></span>入金時點</span>
-        <span><span class="key" style="background:var(--flow-out)"></span>出金時點</span>
+        <span><span class="key" style="background:var(--series-1)"></span>TWR index</span>
+        <span><span class="key" style="background:var(--ink-muted)"></span>NDX (rebased)</span>
+        <span><span class="key" style="background:var(--flow-in)"></span>Deposit</span>
+        <span><span class="key" style="background:var(--flow-out)"></span>Withdrawal</span>
       </div>
       <div class="tooltip" id="us-tip-index"></div>
     </div>
     <div class="card" id="us-card-deploy">
-      <h2>進場資金 vs NDX(同進出場時點,2022/5 起)</h2>
-      <p class="desc">只看放進市場的錢:買股即計入、賣回現金即停止計算,兩帳戶合併。灰線 = 同樣的進出場時點改買 NDX(做空期間灰線照漲,那正是做空的機會成本)。兩線差距 = 選股;藍實線與淡虛線(全帳戶 TWR)差距 = 現金拖累與進出場時機。近似值:未含手續費(高估)與股息(低估);美國國債持有期間以成本計價。</p>
+      <h2>Deployed Capital vs NDX (matched timing)</h2>
       <div id="us-chart-deploy"></div>
       <div class="legend">
-        <span><span class="key" style="background:var(--series-1)"></span>進場資金指數</span>
-        <span><span class="key" style="background:var(--ink-muted)"></span>NDX(同步進出)</span>
-        <span><span class="key" style="background:var(--series-1);opacity:.35"></span>全帳戶 TWR</span>
+        <span><span class="key" style="background:var(--series-1)"></span>Deployed capital</span>
+        <span><span class="key" style="background:var(--ink-muted)"></span>NDX (matched)</span>
       </div>
       <div class="tooltip" id="us-tip-deploy"></div>
     </div>
     <div class="card" id="us-card-dd">
-      <h2>水下圖(距歷史高點回撤)</h2>
-      <p class="desc">距離指數歷史高點的百分比。0 = 創新高。2022-2023 月頻段的月內回撤看不到,實際可能更深。</p>
+      <h2>Underwater</h2>
       <div id="us-chart-dd"></div>
       <div class="tooltip" id="us-tip-dd"></div>
     </div>
     <div class="card">
-      <h2>月報酬熱力圖</h2>
-      <p class="desc">各月 TWR 報酬(%)。藍 = 正、紅 = 負。無結單的月份(2022/7-8、2023/12、2024/5 等)報酬併入下一個有節點的月份。</p>
+      <h2>Monthly Returns</h2>
       <div id="us-chart-heat"></div>
     </div>
     <div class="card">
-      <h2>五大回撤事件</h2>
-      <p class="desc">依深度排序。「回復」= 指數重回前高的日期;修復天數 = 高點到回復的總天數。</p>
-      <table id="us-dd-table"><thead><tr><th>#</th><th>深度</th><th>高點日</th><th>谷底日</th><th>回復日</th><th>下跌天數</th><th>修復天數</th></tr></thead><tbody></tbody></table>
+      <h2>Top 5 Drawdowns</h2>
+      <table id="us-dd-table"><thead><tr><th>#</th><th>Depth</th><th>Peak</th><th>Trough</th><th>Recovered</th><th>Days down</th><th>Days total</th></tr></thead><tbody></tbody></table>
     </div>
   </div>
 
   <div class="panel" id="panel-tw">
     <div class="tiles" id="tw-tiles"></div>
     <div class="card" id="tw-card-roll">
-      <h2>Rolling 12 個月 TWR vs 0050</h2>
-      <p class="desc">每一天回看過去 365 天的報酬,舊資料會滾出視窗——這是「現在的你」的計分板。藍在灰上 = 最近一年贏指數。</p>
+      <h2>Rolling 12-Month TWR vs 0050</h2>
       <div id="tw-chart-roll"></div>
       <div class="legend">
-        <span><span class="key" style="background:var(--series-1)"></span>近 12 個月 TWR</span>
-        <span><span class="key" style="background:var(--ink-muted)"></span>0050 同期</span>
+        <span><span class="key" style="background:var(--series-1)"></span>Trailing 12M TWR</span>
+        <span><span class="key" style="background:var(--ink-muted)"></span>0050 same window</span>
       </div>
       <div class="tooltip" id="tw-tip-roll"></div>
     </div>
     <div class="card" id="tw-card-index">
-      <h2>淨值指數(持倉部位)vs 0050</h2>
-      <p class="desc">日報酬連乘,100 = 2019 年 1 月首筆交易。0050 同日 rebase 至 100,兩邊皆不含息。配股/拆分/減資以還原基準自動調整;未含現金股利與手續費(估計低估報酬 1-3%/年)。空手期間指數走平。</p>
+      <h2>NAV Index vs 0050</h2>
       <div id="tw-chart-index"></div>
       <div class="legend">
-        <span><span class="key" style="background:var(--series-1)"></span>TWR 指數</span>
-        <span><span class="key" style="background:var(--ink-muted)"></span>0050(rebased)</span>
+        <span><span class="key" style="background:var(--series-1)"></span>TWR index</span>
+        <span><span class="key" style="background:var(--ink-muted)"></span>0050 (rebased)</span>
       </div>
       <div class="tooltip" id="tw-tip-index"></div>
     </div>
     <div class="card" id="tw-card-dd">
-      <h2>水下圖(距歷史高點回撤)</h2>
-      <p class="desc">距離指數歷史高點的百分比。0 = 創新高。</p>
+      <h2>Underwater</h2>
       <div id="tw-chart-dd"></div>
       <div class="tooltip" id="tw-tip-dd"></div>
     </div>
     <div class="card">
-      <h2>月報酬熱力圖</h2>
-      <p class="desc">各月 TWR 報酬(%)。藍 = 正、紅 = 負。</p>
+      <h2>Monthly Returns</h2>
       <div id="tw-chart-heat"></div>
     </div>
     <div class="card">
-      <h2>五大回撤事件</h2>
-      <p class="desc">依深度排序。「回復」= 指數重回前高的日期;修復天數 = 高點到回復的總天數。</p>
-      <table id="tw-dd-table"><thead><tr><th>#</th><th>深度</th><th>高點日</th><th>谷底日</th><th>回復日</th><th>下跌天數</th><th>修復天數</th></tr></thead><tbody></tbody></table>
+      <h2>Top 5 Drawdowns</h2>
+      <table id="tw-dd-table"><thead><tr><th>#</th><th>Depth</th><th>Peak</th><th>Trough</th><th>Recovered</th><th>Days down</th><th>Days total</th></tr></thead><tbody></tbody></table>
     </div>
   </div>
 </div>
@@ -170,9 +155,6 @@
 <script>
 const US = __DATA_US__;
 const TW = __DATA_TW__;
-
-document.getElementById("subline").textContent =
-  `美股資料截至 ${US.asof}(IB 段已對帳官方年度 TWR,誤差 < 0.001%)・ 台股資料截至 ${TW.asof}(近似值,不含現金股利)・ 出入金影響已剔除(時間加權)`;
 
 // ---------- tabs ----------
 document.querySelectorAll(".tab").forEach(b => b.addEventListener("click", () => {
@@ -190,6 +172,8 @@ try {
 // ---------- shared chart helpers ----------
 const W = 920, ML = 46, MR = 14, MT = 10;
 const fmt2 = x => x.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const pct = v => (v >= 0 ? "+" : "") + v.toFixed(1) + "%";
+const lastNonNull = a => a.filter(v => v != null).slice(-1)[0];
 
 function mkScale(datesArr) {
   const t0 = new Date(datesArr[0]).getTime(), t1 = new Date(datesArr[datesArr.length - 1]).getTime();
@@ -262,7 +246,6 @@ function tiles(elId, items) {
 }
 
 function lineChart(opts) {
-  // opts: chartEl, cardId, tipId, dts, series [{arr, stroke, width, opacity, dash}], flows, baseline, tooltip(i, Y)
   const H = opts.H || 380, MB = 26;
   const baseline = opts.baseline ?? 100;
   const sc = mkScale(opts.dts);
@@ -285,7 +268,7 @@ function lineChart(opts) {
     const pts = isIn ? `${x},${y - 5} ${x - 5},${y + 4} ${x + 5},${y + 4}`
                      : `${x},${y + 5} ${x - 5},${y - 4} ${x + 5},${y - 4}`;
     flows += `<polygon points="${pts}" fill="var(--flow-${isIn ? "in" : "out"})" stroke="var(--surface-1)" stroke-width="1.5">` +
-             `<title>${f.date} ${isIn ? "入金" : "出金"} ${fmt2(Math.abs(f.amount))} USD</title></polygon>`;
+             `<title>${f.date} ${isIn ? "Deposit" : "Withdrawal"} ${fmt2(Math.abs(f.amount))} USD</title></polygon>`;
   }
 
   const paths = opts.series.map(s =>
@@ -304,7 +287,6 @@ function lineChart(opts) {
 }
 
 function underwaterChart(opts) {
-  // opts: chartEl, cardId, tipId, dts, dd, holdings?
   const H = 240, MB = 26;
   const sc = mkScale(opts.dts);
   const dmin = Math.floor(Math.min(...opts.dd) / 5) * 5;
@@ -326,11 +308,12 @@ function underwaterChart(opts) {
   attachHover(opts.cardId, opts.tipId, sc, H, i => {
     const v = opts.dd[i];
     let html = `<div class="t-date">${opts.dts[i]}</div><div class="t-val neg-txt">${v.toFixed(1)}%</div>`;
-    if (opts.holdings) html += `<div style="color:var(--ink-2);margin-top:4px;max-width:250px;line-height:1.5">持倉:${opts.holdings[i] || "(空手)"}</div>`;
+    if (opts.holdings) html += `<div style="color:var(--ink-2);margin-top:4px;max-width:250px;line-height:1.5">Holdings: ${opts.holdings[i] || "(none)"}</div>`;
     return [Y(v), html];
   });
 }
 
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 function heatmap(elId, monthly) {
   const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
   const years = [...new Set(monthly.map(m => m.y))];
@@ -347,7 +330,7 @@ function heatmap(elId, monthly) {
   }
   let g = "";
   for (let m = 1; m <= 12; m++)
-    g += `<text x="${left + (m - 0.5) * cellW}" y="${top - 8}" text-anchor="middle" font-size="11" fill="var(--ink-muted)">${m}月</text>`;
+    g += `<text x="${left + (m - 0.5) * cellW}" y="${top - 8}" text-anchor="middle" font-size="11" fill="var(--ink-muted)">${MONTHS[m - 1]}</text>`;
   years.forEach((y, r) => {
     g += `<text x="${left - 10}" y="${top + r * cellH + cellH / 2 + 4}" text-anchor="end" font-size="12" fill="var(--ink-2)">${y}</text>`;
     for (let m = 1; m <= 12; m++) {
@@ -359,7 +342,7 @@ function heatmap(elId, monthly) {
       }
       const ink = Math.abs(v) / amax > 0.55 ? "#ffffff" : "var(--ink-1)";
       g += `<rect x="${x + 1}" y="${yy + 1}" width="${cellW - 2}" height="${cellH - 2}" rx="6" fill="${cellColor(v)}">` +
-           `<title>${y}/${m}: ${v >= 0 ? "+" : ""}${v.toFixed(2)}%</title></rect>` +
+           `<title>${MONTHS[m - 1]} ${y}: ${v >= 0 ? "+" : ""}${v.toFixed(2)}%</title></rect>` +
            `<text x="${x + cellW / 2}" y="${yy + cellH / 2 + 4}" text-anchor="middle" font-size="11" fill="${ink}">${v >= 0 ? "+" : ""}${v.toFixed(1)}</text>`;
     }
   });
@@ -370,36 +353,39 @@ function heatmap(elId, monthly) {
 function ddTable(tableId, eps) {
   document.querySelector(`#${tableId} tbody`).innerHTML = eps.map((e, i) =>
     `<tr><td>${i + 1}</td><td class="neg-txt">${e.depth.toFixed(1)}%</td>` +
-    `<td>${e.peak}</td><td>${e.trough}</td><td>${e.recovered ?? "尚未回復"}</td>` +
+    `<td>${e.peak}</td><td>${e.trough}</td><td>${e.recovered ?? "not yet"}</td>` +
     `<td>${e.days_down}</td><td>${e.days_total ?? "—"}</td></tr>`).join("");
 }
 
-// ================= US panel =================
-const pct = v => (v >= 0 ? "+" : "") + v.toFixed(1) + "%";
-const lastNonNull = a => a.filter(v => v != null).slice(-1)[0];
+function rollingChart(prefix, dts, roll, bench, benchName) {
+  // trim leading nulls so the line starts at the chart's left edge
+  const s = roll.findIndex(v => v != null);
+  const d2 = dts.slice(s), r2 = roll.slice(s), b2 = bench.slice(s);
+  lineChart({
+    chartEl: `${prefix}-chart-roll`, cardId: `${prefix}-card-roll`, tipId: `${prefix}-tip-roll`,
+    dts: d2, H: 320, baseline: 0,
+    series: [
+      { arr: b2, stroke: "var(--ink-muted)", width: 1.5, opacity: 0.75 },
+      { arr: r2, stroke: "var(--series-1)", width: 2 },
+    ],
+    tooltip: (i, Y) => {
+      const v = r2[i], b = b2[i];
+      const gap = b != null ? v - b : null;
+      return [Y(v), `<div class="t-date">${d2[i]}</div><div class="t-val">1y ${pct(v)}</div>` +
+        (b != null ? `<div style="color:var(--ink-2)">${benchName} ${pct(b)}</div>` : "") +
+        (gap != null ? `<div style="color:var(--ink-2)">Gap ${pct(gap)}</div>` : "")];
+    },
+  });
+}
 
+// ================= US panel =================
 tiles("us-tiles", [
-  ["近 12 個月 TWR", pct(lastNonNull(US.roll)), "NDX 同期 " + pct(lastNonNull(US.roll_bench))],
-  ["金額加權年化 (XIRR)", pct(US.xirr) + "/yr", "以實際出入金計"],
-  ["總報酬 (since 2022/5)", pct(US.cfinal - 100), "TWR,歷史全紀錄"],
-  ["目前回撤", US.cdd[US.cdd.length - 1].toFixed(1) + "%", "距 " + US.ctop_dd[0].peak + " 高點"],
+  ["Trailing 12M TWR", pct(lastNonNull(US.roll)), "NDX " + pct(lastNonNull(US.roll_bench)) + " same window"],
+  ["Money-weighted (XIRR)", pct(US.xirr) + "/yr", "actual cash flows"],
+  ["Total return (since 2022-05)", pct(US.cfinal - 100), "TWR, full history"],
+  ["Current drawdown", US.cdd[US.cdd.length - 1].toFixed(1) + "%", "from " + US.ctop_dd[0].peak + " peak"],
 ]);
-lineChart({
-  chartEl: "us-chart-roll", cardId: "us-card-roll", tipId: "us-tip-roll",
-  dts: US.cdates, H: 320, baseline: 0,
-  series: [
-    { arr: US.roll_bench, stroke: "var(--ink-muted)", width: 1.5, opacity: 0.75 },
-    { arr: US.roll, stroke: "var(--series-1)", width: 2 },
-  ],
-  tooltip: (i, Y) => {
-    const v = US.roll[i], b = US.roll_bench[i];
-    if (v == null) return [Y(0), `<div class="t-date">${US.cdates[i]}</div><div class="t-val">未滿一年</div>`];
-    const gap = b != null ? v - b : null;
-    return [Y(v), `<div class="t-date">${US.cdates[i]}</div><div class="t-val">近一年 ${pct(v)}</div>` +
-      (b != null ? `<div style="color:var(--ink-2)">NDX 同期 ${pct(b)}</div>` : "") +
-      (gap != null ? `<div style="color:var(--ink-2)">差距 ${pct(gap)}</div>` : "")];
-  },
-});
+rollingChart("us", US.cdates, US.roll, US.roll_bench, "NDX");
 lineChart({
   chartEl: "us-chart-index", cardId: "us-card-index", tipId: "us-tip-index",
   dts: US.cdates, flows: US.cflows,
@@ -409,26 +395,25 @@ lineChart({
   ],
   tooltip: (i, Y) => {
     const v = US.cindex[i], ret = (v / 100 - 1) * 100, ndx = US.cndx[i];
-    return [Y(v), `<div class="t-date">${US.cdates[i]}</div><div class="t-val">指數 ${v.toFixed(1)}</div>` +
-      `<div style="color:var(--ink-2)">累積 ${(ret >= 0 ? "+" : "") + ret.toFixed(1)}%</div>` +
+    return [Y(v), `<div class="t-date">${US.cdates[i]}</div><div class="t-val">Index ${v.toFixed(1)}</div>` +
+      `<div style="color:var(--ink-2)">Cum. ${pct(ret)}</div>` +
       (ndx != null ? `<div style="color:var(--ink-2)">NDX ${ndx.toFixed(1)}</div>` : "") +
-      `<div style="color:var(--ink-2);margin-top:4px;max-width:230px;line-height:1.5">持倉:${US.choldings[i] || "(空手)"}</div>`];
+      `<div style="color:var(--ink-2);margin-top:4px;max-width:230px;line-height:1.5">Holdings: ${US.choldings[i] || "(none)"}</div>`];
   },
 });
 lineChart({
   chartEl: "us-chart-deploy", cardId: "us-card-deploy", tipId: "us-tip-deploy",
   dts: US.ddates, H: 340,
   series: [
-    { arr: US.dref, stroke: "var(--series-1)", width: 1.5, opacity: 0.35, dash: "5 4" },
     { arr: US.ndx_matched, stroke: "var(--ink-muted)", width: 1.5, opacity: 0.85 },
     { arr: US.deploy, stroke: "var(--series-1)", width: 2 },
   ],
   tooltip: (i, Y) => {
     const dv = US.deploy[i], nv = US.ndx_matched[i], gap = dv - nv;
-    return [Y(dv), `<div class="t-date">${US.ddates[i]}</div><div class="t-val">進場資金 ${dv.toFixed(1)}</div>` +
-      `<div style="color:var(--ink-2)">NDX 同步 ${nv.toFixed(1)}</div>` +
-      `<div style="color:var(--ink-2)">選股差距 ${(gap >= 0 ? "+" : "") + gap.toFixed(1)}</div>` +
-      `<div style="color:var(--ink-2);margin-top:4px;max-width:230px;line-height:1.5">持倉:${US.dholdings[i] || "(空手)"}</div>`];
+    return [Y(dv), `<div class="t-date">${US.ddates[i]}</div><div class="t-val">Deployed ${dv.toFixed(1)}</div>` +
+      `<div style="color:var(--ink-2)">NDX matched ${nv.toFixed(1)}</div>` +
+      `<div style="color:var(--ink-2)">Gap ${pct(gap)}</div>` +
+      `<div style="color:var(--ink-2);margin-top:4px;max-width:230px;line-height:1.5">Holdings: ${US.dholdings[i] || "(none)"}</div>`];
   },
 });
 underwaterChart({ chartEl: "us-chart-dd", cardId: "us-card-dd", tipId: "us-tip-dd", dts: US.cdates, dd: US.cdd });
@@ -437,27 +422,12 @@ ddTable("us-dd-table", US.ctop_dd);
 
 // ================= TW panel =================
 tiles("tw-tiles", [
-  ["近 12 個月 TWR", pct(lastNonNull(TW.roll)), "0050 同期 " + pct(lastNonNull(TW.roll_bench))],
-  ["金額加權年化 (XIRR)", pct(TW.xirr) + "/yr", "以逐筆買賣現金流計"],
-  ["總報酬 (since 2019/1)", pct(TW.final - 100), "TWR,歷史全紀錄"],
-  ["目前回撤", TW.drawdown[TW.drawdown.length - 1].toFixed(1) + "%", "距 " + TW.top_dd[0].peak + " 高點"],
+  ["Trailing 12M TWR", pct(lastNonNull(TW.roll)), "0050 " + pct(lastNonNull(TW.roll_bench)) + " same window"],
+  ["Money-weighted (XIRR)", pct(TW.xirr) + "/yr", "per-trade cash flows"],
+  ["Total return (since 2019-01)", pct(TW.final - 100), "TWR, full history"],
+  ["Current drawdown", TW.drawdown[TW.drawdown.length - 1].toFixed(1) + "%", "from " + TW.top_dd[0].peak + " peak"],
 ]);
-lineChart({
-  chartEl: "tw-chart-roll", cardId: "tw-card-roll", tipId: "tw-tip-roll",
-  dts: TW.dates, H: 320, baseline: 0,
-  series: [
-    { arr: TW.roll_bench, stroke: "var(--ink-muted)", width: 1.5, opacity: 0.75 },
-    { arr: TW.roll, stroke: "var(--series-1)", width: 2 },
-  ],
-  tooltip: (i, Y) => {
-    const v = TW.roll[i], b = TW.roll_bench[i];
-    if (v == null) return [Y(0), `<div class="t-date">${TW.dates[i]}</div><div class="t-val">未滿一年</div>`];
-    const gap = b != null ? v - b : null;
-    return [Y(v), `<div class="t-date">${TW.dates[i]}</div><div class="t-val">近一年 ${pct(v)}</div>` +
-      (b != null ? `<div style="color:var(--ink-2)">0050 同期 ${pct(b)}</div>` : "") +
-      (gap != null ? `<div style="color:var(--ink-2)">差距 ${pct(gap)}</div>` : "")];
-  },
-});
+rollingChart("tw", TW.dates, TW.roll, TW.roll_bench, "0050");
 lineChart({
   chartEl: "tw-chart-index", cardId: "tw-card-index", tipId: "tw-tip-index",
   dts: TW.dates,
@@ -467,10 +437,10 @@ lineChart({
   ],
   tooltip: (i, Y) => {
     const v = TW.index[i], ret = (v / 100 - 1) * 100, b = TW.bench[i];
-    return [Y(v), `<div class="t-date">${TW.dates[i]}</div><div class="t-val">指數 ${v.toFixed(1)}</div>` +
-      `<div style="color:var(--ink-2)">累積 ${(ret >= 0 ? "+" : "") + ret.toFixed(1)}%</div>` +
+    return [Y(v), `<div class="t-date">${TW.dates[i]}</div><div class="t-val">Index ${v.toFixed(1)}</div>` +
+      `<div style="color:var(--ink-2)">Cum. ${pct(ret)}</div>` +
       (b != null ? `<div style="color:var(--ink-2)">0050 ${b.toFixed(1)}</div>` : "") +
-      `<div style="color:var(--ink-2);margin-top:4px;max-width:250px;line-height:1.5">持倉:${TW.holdings[i] || "(空手)"}</div>`];
+      `<div style="color:var(--ink-2);margin-top:4px;max-width:250px;line-height:1.5">Holdings: ${TW.holdings[i] || "(none)"}</div>`];
   },
 });
 underwaterChart({ chartEl: "tw-chart-dd", cardId: "tw-card-dd", tipId: "tw-tip-dd", dts: TW.dates, dd: TW.drawdown, holdings: TW.holdings });

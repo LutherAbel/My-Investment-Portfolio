@@ -329,12 +329,6 @@ def episodes(ix, dts):
     out.sort(key=lambda e: e["depth"])
     return out
 
-ci_by_date = dict(zip(cdates, cindex))
-dref, last_ci = [], None
-for ds in ddates:
-    last_ci = ci_by_date.get(ds, last_ci)
-    dref.append(last_ci)
-
 # ---------------- rolling 12-month TWR vs NDX, and XIRR ----------------
 def close_asof(cd, d, back=10):
     for k in range(back):
@@ -382,7 +376,7 @@ out = {
     "ctop_dd": episodes(cindex, cdates)[:5],
     "cfinal": round(cindex[-1], 2), "cmax_dd": round(min(cdd), 2),
     "ddates": ddates, "deploy": deploy_index, "ndx_matched": ndx_matched_index,
-    "dholdings": dholdings, "dref": dref,
+    "dholdings": dholdings,
     "roll": roll, "roll_bench": roll_bench, "xirr": xirr_pct,
 }
 json.dump(out, open(rf"{DATA}\twr_data.json", "w"))
