@@ -46,7 +46,8 @@
   .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
           padding: 16px; margin-bottom: 20px; position: relative; }
   .card h2 { font-size: 14px; margin: 0 0 10px; }
-  .hnum { display: inline-block; min-width: 11ch; font-variant-numeric: tabular-nums; }
+  .ritem { display: inline-block; width: 15.5rem; white-space: nowrap; }
+  .hnum { font-variant-numeric: tabular-nums; }
   b.hnum { color: var(--series-1); font-weight: 650; }
   svg { display: block; width: 100%; height: auto; }
   .tooltip { position: absolute; pointer-events: none; display: none; background: var(--surface-1);
@@ -87,7 +88,7 @@
       <h2>Money-weighted Return (XIRR) over Time</h2>
       <div id="us-chart-xirr"></div>
       <div class="legend">
-        <span><span class="key" style="background:var(--series-1)"></span>My XIRR</span>
+        <span><span class="key" style="background:var(--series-1)"></span>XIRR</span>
         <span><span class="key" style="background:var(--ink-muted)"></span>NDX shadow (same deposits/withdrawals)</span>
       </div>
       <div class="tooltip" id="us-tip-xirr"></div>
@@ -95,8 +96,8 @@
     <div class="card" id="us-card-pnl">
       <h2>Cumulative P&amp;L vs NDX Shadow (USD, matched deployment)</h2>
       <div class="legend" style="margin: 0 0 10px">
-        <span><span class="key" style="background:var(--series-1)"></span>My P&amp;L <b class="hnum" id="us-pnl-mine"></b></span>
-        <span><span class="key" style="background:var(--ink-muted)"></span>Shadow <span class="hnum" id="us-pnl-shadow"></span></span>
+        <span class="ritem"><span class="key" style="background:var(--series-1)"></span>P&amp;L <b class="hnum" id="us-pnl-mine"></b></span>
+        <span class="ritem"><span class="key" style="background:var(--ink-muted)"></span>Shadow <span class="hnum" id="us-pnl-shadow"></span></span>
       </div>
       <div id="us-chart-pnl"></div>
       <div class="tooltip" id="us-tip-pnl"></div>
@@ -126,7 +127,7 @@
       <h2>Money-weighted Return (XIRR) over Time</h2>
       <div id="tw-chart-xirr"></div>
       <div class="legend">
-        <span><span class="key" style="background:var(--series-1)"></span>My XIRR</span>
+        <span><span class="key" style="background:var(--series-1)"></span>XIRR</span>
         <span><span class="key" style="background:var(--ink-muted)"></span>0050 shadow (same deployment)</span>
       </div>
       <div class="tooltip" id="tw-tip-xirr"></div>
@@ -134,8 +135,8 @@
     <div class="card" id="tw-card-pnl">
       <h2>Cumulative P&amp;L vs 0050 Shadow (TWD, matched deployment)</h2>
       <div class="legend" style="margin: 0 0 10px">
-        <span><span class="key" style="background:var(--series-1)"></span>My P&amp;L <b class="hnum" id="tw-pnl-mine"></b></span>
-        <span><span class="key" style="background:var(--ink-muted)"></span>Shadow <span class="hnum" id="tw-pnl-shadow"></span></span>
+        <span class="ritem"><span class="key" style="background:var(--series-1)"></span>P&amp;L <b class="hnum" id="tw-pnl-mine"></b></span>
+        <span class="ritem"><span class="key" style="background:var(--ink-muted)"></span>Shadow <span class="hnum" id="tw-pnl-shadow"></span></span>
       </div>
       <div id="tw-chart-pnl"></div>
       <div class="tooltip" id="tw-tip-pnl"></div>
