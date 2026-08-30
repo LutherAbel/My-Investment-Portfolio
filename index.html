@@ -46,8 +46,8 @@
   .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
           padding: 16px; margin-bottom: 20px; position: relative; }
   .card h2 { font-size: 14px; margin: 0 0 10px; }
-  .hval { font-weight: 500; color: var(--ink-2); font-variant-numeric: tabular-nums; }
-  .hval b { color: var(--series-1); font-weight: 650; }
+  .hnum { display: inline-block; min-width: 11ch; font-variant-numeric: tabular-nums; }
+  b.hnum { color: var(--series-1); font-weight: 650; }
   svg { display: block; width: 100%; height: auto; }
   .tooltip { position: absolute; pointer-events: none; display: none; background: var(--surface-1);
              border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.15);
@@ -86,18 +86,19 @@
         <div class="card" id="us-card-xirr">
       <h2>Money-weighted Return (XIRR) over Time</h2>
       <div id="us-chart-xirr"></div>
+      <div class="legend">
+        <span><span class="key" style="background:var(--series-1)"></span>My XIRR</span>
+        <span><span class="key" style="background:var(--ink-muted)"></span>NDX shadow (same deposits/withdrawals)</span>
+      </div>
       <div class="tooltip" id="us-tip-xirr"></div>
     </div>
     <div class="card" id="us-card-pnl">
-      <h2 style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
-        <span>Cumulative P&amp;L vs NDX Shadow (USD, matched deployment)</span>
-        <span class="hval" id="us-pnl-vals"></span>
-      </h2>
-      <div id="us-chart-pnl"></div>
-      <div class="legend">
-        <span><span class="key" style="background:var(--series-1)"></span>My P&amp;L</span>
-        <span><span class="key" style="background:var(--ink-muted)"></span>NDX shadow (same buys, same exit fractions)</span>
+      <h2>Cumulative P&amp;L vs NDX Shadow (USD, matched deployment)</h2>
+      <div class="legend" style="margin: 0 0 10px">
+        <span><span class="key" style="background:var(--series-1)"></span>My P&amp;L <b class="hnum" id="us-pnl-mine"></b></span>
+        <span><span class="key" style="background:var(--ink-muted)"></span>Shadow <span class="hnum" id="us-pnl-shadow"></span></span>
       </div>
+      <div id="us-chart-pnl"></div>
       <div class="tooltip" id="us-tip-pnl"></div>
     </div>
                 <div class="card">
@@ -124,18 +125,19 @@
     <div class="card" id="tw-card-xirr">
       <h2>Money-weighted Return (XIRR) over Time</h2>
       <div id="tw-chart-xirr"></div>
+      <div class="legend">
+        <span><span class="key" style="background:var(--series-1)"></span>My XIRR</span>
+        <span><span class="key" style="background:var(--ink-muted)"></span>0050 shadow (same deployment)</span>
+      </div>
       <div class="tooltip" id="tw-tip-xirr"></div>
     </div>
     <div class="card" id="tw-card-pnl">
-      <h2 style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
-        <span>Cumulative P&amp;L vs 0050 Shadow (TWD, matched deployment)</span>
-        <span class="hval" id="tw-pnl-vals"></span>
-      </h2>
-      <div id="tw-chart-pnl"></div>
-      <div class="legend">
-        <span><span class="key" style="background:var(--series-1)"></span>My P&amp;L</span>
-        <span><span class="key" style="background:var(--ink-muted)"></span>0050 shadow (same buys, same exit fractions)</span>
+      <h2>Cumulative P&amp;L vs 0050 Shadow (TWD, matched deployment)</h2>
+      <div class="legend" style="margin: 0 0 10px">
+        <span><span class="key" style="background:var(--series-1)"></span>My P&amp;L <b class="hnum" id="tw-pnl-mine"></b></span>
+        <span><span class="key" style="background:var(--ink-muted)"></span>Shadow <span class="hnum" id="tw-pnl-shadow"></span></span>
       </div>
+      <div id="tw-chart-pnl"></div>
       <div class="tooltip" id="tw-tip-pnl"></div>
     </div>
         <div class="card">
@@ -217,11 +219,16 @@ function attachHover(cardId, tipId, scale, H, valueAt) {
     dot.style.display = "block";
     tip.innerHTML = html;
     tip.style.display = "block";
+    // dock in the top corner opposite the cursor so it never covers the hovered point
     const cardR = card.getBoundingClientRect();
-    let tx = (scale.X(i) / W) * r.width + (r.left - cardR.left) + 14;
-    if (tx > cardR.width - 200) tx -= 240;
-    tip.style.left = tx + "px";
-    tip.style.top = ((y / H) * r.height + (r.top - cardR.top) - 20) + "px";
+    if (px < W / 2) {
+      tip.style.left = "";
+      tip.style.right = "24px";
+    } else {
+      tip.style.right = "";
+      tip.style.left = (r.left - cardR.left + 8) + "px";
+    }
+    tip.style.top = (r.top - cardR.top + 8) + "px";
   });
   svg.addEventListener("mouseleave", () => {
     tip.style.display = "none"; cross.style.display = "none"; dot.style.display = "none";
@@ -373,9 +380,11 @@ tiles("us-tiles", [
 function pnlChart(prefix, dts, mine, shadow, cur, holdings) {
   const kFmt = v => Math.abs(v) >= 1000 ? (v / 1000).toFixed(0) + "k" : v;
   const money = v => (v >= 0 ? "+" : "") + v.toLocaleString("en-US", {maximumFractionDigits: 0});
-  const hdr = document.getElementById(`${prefix}-pnl-vals`);
+  const elMine = document.getElementById(`${prefix}-pnl-mine`);
+  const elShadow = document.getElementById(`${prefix}-pnl-shadow`);
   const setHdr = i => {
-    hdr.innerHTML = `<b>${money(mine[i])} ${cur}</b>&ensp;·&ensp;shadow ${money(shadow[i])}`;
+    elMine.textContent = `${money(mine[i])} ${cur}`;
+    elShadow.textContent = `${money(shadow[i])} ${cur}`;
   };
   setHdr(mine.length - 1);
   lineChart({
