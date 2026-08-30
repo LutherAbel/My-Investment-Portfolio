@@ -64,7 +64,10 @@ cal = [d for d in cal if d >= trades[0][0]]
 pos = defaultdict(float)      # adjusted shares (market value)
 raw_pos = defaultdict(float)  # raw shares (what is actually held)
 ti = 0
-dates, index_vals, dd_vals, holdings_by_day = [], [], [], []
+dates, index_vals, dd_vals, holdings_by_day, mv_by_day = [], [], [], [], []
+pnl_series, shadow_pnl_series = [], []
+shadow_units = cum_buys = cum_sells = shadow_cum_sells = 0.0
+shadow_flows, shadow_val_by_day = [], []   # the shadow account's own cash flows / daily value
 bench_vals, bench_matched = [], []
 ret_by_day = {}
 idx = peak = 100.0
@@ -110,6 +113,26 @@ for di_, d in enumerate(cal):
     bench_vals.append(round(b_raw, 2))
     bench_matched.append(round(b_match, 2))
     holdings_by_day.append(" · ".join(sorted(names[t] for t, q in raw_pos.items() if q > 0.5)))
+    mv_by_day.append(mv)
+    # dollar P&L vs matched-deployment 0050 shadow: same buy TWD, same sell fractions
+    px = prev_b_close if di_ == 0 else prices["0050"]["close"].get(d.isoformat(), prev_b_close)
+    sells = gb - nb
+    denom_s = prev_mv + gb
+    shadow_units += gb / px
+    if gb > 0:
+        shadow_flows.append((d, -gb))
+    f = sells / denom_s if denom_s > 100 else (1.0 if sells > 0 else 0.0)
+    f = min(max(f, 0.0), 1.0)
+    proceeds = f * shadow_units * px
+    if proceeds > 0:
+        shadow_flows.append((d, proceeds))
+    shadow_cum_sells += proceeds
+    shadow_units *= 1 - f
+    cum_buys += gb
+    cum_sells += sells
+    pnl_series.append(round(mv + cum_sells - cum_buys))
+    shadow_pnl_series.append(round(shadow_units * px + shadow_cum_sells - cum_buys))
+    shadow_val_by_day.append(shadow_units * px)
     prev_mv = mv
 
 final_held = {t for t, q in raw_pos.items() if q > 0.5}
@@ -184,9 +207,51 @@ def xirr(flows):
 xf = sorted([(d, -money) for d, _, _, _, money in trades] + [(cal_d[-1], prev_mv)])
 xirr_pct = round(xirr(xf) * 100, 2)
 
+# XIRR through time: weekly samples, flows so far + that day's market value
+flow_items = sorted((d, -money) for d, _, _, _, money in trades)
+xdates, xirr_series, xirr_bench = [], [], []
+for i, d in enumerate(cal_d):
+    if (d - cal_d[0]).days < 365:
+        continue
+    if i % 5 == 0 or i == len(cal_d) - 1:
+        fl = [(k, a) for k, a in flow_items if k <= d] + [(d, mv_by_day[i])]
+        sfl = [(k, a) for k, a in shadow_flows if k <= d] + [(d, shadow_val_by_day[i])]
+        xdates.append(dates[i])
+        xirr_series.append(round(xirr(fl) * 100, 2))
+        xirr_bench.append(round(xirr(sfl) * 100, 2))
+
+def dollar_episodes(pnl, dts):
+    eps, p, t, in_dd = [], 0, 0, False
+    for i in range(1, len(pnl)):
+        if pnl[i] >= pnl[p]:
+            if in_dd:
+                eps.append((p, t, i))
+                in_dd = False
+            p = t = i
+        else:
+            in_dd = True
+            if pnl[i] < pnl[t]:
+                t = i
+    if in_dd:
+        eps.append((p, t, None))
+    out = []
+    for p, t, rcv in eps:
+        out.append({
+            "depth": round(pnl[t] - pnl[p]),
+            "peak": dts[p], "trough": dts[t],
+            "recovered": dts[rcv] if rcv is not None else None,
+            "days_down": (date.fromisoformat(dts[t]) - date.fromisoformat(dts[p])).days,
+            "days_total": (date.fromisoformat(dts[rcv]) - date.fromisoformat(dts[p])).days if rcv is not None else None,
+        })
+    out.sort(key=lambda e: e["depth"])
+    return out
+
 out = {
     "asof": dates[-1],
     "roll": roll, "roll_bench": roll_bench, "xirr": xirr_pct,
+    "xdates": xdates, "xirr_series": xirr_series, "xirr_bench": xirr_bench,
+    "pnl": pnl_series, "shadow_pnl": shadow_pnl_series,
+    "pnl_dd": dollar_episodes(pnl_series, dates)[:5],
     "dates": dates, "index": index_vals, "bench": bench_vals,
     "bench_matched": bench_matched, "drawdown": dd_vals,
     "holdings": holdings_by_day, "monthly": monthly_out, "top_dd": top[:5],

@@ -46,6 +46,8 @@
   .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
           padding: 16px; margin-bottom: 20px; position: relative; }
   .card h2 { font-size: 14px; margin: 0 0 10px; }
+  .hval { font-weight: 500; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .hval b { color: var(--series-1); font-weight: 650; }
   svg { display: block; width: 100%; height: auto; }
   .tooltip { position: absolute; pointer-events: none; display: none; background: var(--surface-1);
              border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.15);
@@ -81,32 +83,24 @@
       </div>
       <div class="tooltip" id="us-tip-roll"></div>
     </div>
-    <div class="card" id="us-card-index">
-      <h2>NAV Index vs NDX</h2>
-      <div id="us-chart-index"></div>
+        <div class="card" id="us-card-xirr">
+      <h2>Money-weighted Return (XIRR) over Time</h2>
+      <div id="us-chart-xirr"></div>
+      <div class="tooltip" id="us-tip-xirr"></div>
+    </div>
+    <div class="card" id="us-card-pnl">
+      <h2 style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <span>Cumulative P&amp;L vs NDX Shadow (USD, matched deployment)</span>
+        <span class="hval" id="us-pnl-vals"></span>
+      </h2>
+      <div id="us-chart-pnl"></div>
       <div class="legend">
-        <span><span class="key" style="background:var(--series-1)"></span>TWR index</span>
-        <span><span class="key" style="background:var(--ink-muted)"></span>NDX (rebased)</span>
-        <span><span class="key" style="background:var(--flow-in)"></span>Deposit</span>
-        <span><span class="key" style="background:var(--flow-out)"></span>Withdrawal</span>
+        <span><span class="key" style="background:var(--series-1)"></span>My P&amp;L</span>
+        <span><span class="key" style="background:var(--ink-muted)"></span>NDX shadow (same buys, same exit fractions)</span>
       </div>
-      <div class="tooltip" id="us-tip-index"></div>
+      <div class="tooltip" id="us-tip-pnl"></div>
     </div>
-    <div class="card" id="us-card-deploy">
-      <h2>Deployed Capital vs NDX (matched timing)</h2>
-      <div id="us-chart-deploy"></div>
-      <div class="legend">
-        <span><span class="key" style="background:var(--series-1)"></span>Deployed capital</span>
-        <span><span class="key" style="background:var(--ink-muted)"></span>NDX (matched)</span>
-      </div>
-      <div class="tooltip" id="us-tip-deploy"></div>
-    </div>
-    <div class="card" id="us-card-dd">
-      <h2>Underwater</h2>
-      <div id="us-chart-dd"></div>
-      <div class="tooltip" id="us-tip-dd"></div>
-    </div>
-    <div class="card">
+                <div class="card">
       <h2>Monthly Returns</h2>
       <div id="us-chart-heat"></div>
     </div>
@@ -127,21 +121,24 @@
       </div>
       <div class="tooltip" id="tw-tip-roll"></div>
     </div>
-    <div class="card" id="tw-card-index">
-      <h2>NAV Index vs 0050</h2>
-      <div id="tw-chart-index"></div>
+    <div class="card" id="tw-card-xirr">
+      <h2>Money-weighted Return (XIRR) over Time</h2>
+      <div id="tw-chart-xirr"></div>
+      <div class="tooltip" id="tw-tip-xirr"></div>
+    </div>
+    <div class="card" id="tw-card-pnl">
+      <h2 style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <span>Cumulative P&amp;L vs 0050 Shadow (TWD, matched deployment)</span>
+        <span class="hval" id="tw-pnl-vals"></span>
+      </h2>
+      <div id="tw-chart-pnl"></div>
       <div class="legend">
-        <span><span class="key" style="background:var(--series-1)"></span>TWR index</span>
-        <span><span class="key" style="background:var(--ink-muted)"></span>0050 (rebased)</span>
+        <span><span class="key" style="background:var(--series-1)"></span>My P&amp;L</span>
+        <span><span class="key" style="background:var(--ink-muted)"></span>0050 shadow (same buys, same exit fractions)</span>
       </div>
-      <div class="tooltip" id="tw-tip-index"></div>
+      <div class="tooltip" id="tw-tip-pnl"></div>
     </div>
-    <div class="card" id="tw-card-dd">
-      <h2>Underwater</h2>
-      <div id="tw-chart-dd"></div>
-      <div class="tooltip" id="tw-tip-dd"></div>
-    </div>
-    <div class="card">
+        <div class="card">
       <h2>Monthly Returns</h2>
       <div id="tw-chart-heat"></div>
     </div>
@@ -252,9 +249,11 @@ function lineChart(opts) {
   const all = opts.series.flatMap(s => s.arr.filter(v => v != null));
   const vmin = Math.min(...all), vmax = Math.max(...all);
   const pad = (vmax - vmin) * 0.06;
-  const lo = Math.floor((vmin - pad) / 10) * 10, hi = Math.ceil((vmax + pad) / 10) * 10;
+  const nice = x => { const p = Math.pow(10, Math.floor(Math.log10(x))); const m = x / p; return (m > 5 ? 10 : m > 2 ? 5 : m > 1 ? 2 : 1) * p; };
+  const step = nice((vmax - vmin + 2 * pad) / 6 || 1);
+  const lo = Math.floor((vmin - pad) / step) * step, hi = Math.ceil((vmax + pad) / step) * step;
   const Y = v => MT + (hi - v) / (hi - lo) * (H - MT - MB);
-  const step = (hi - lo) > 300 ? 50 : (hi - lo) > 90 ? 20 : 10;
+  const yFmt = opts.yFmt || (v => v);
   const yTicks = [];
   for (let v = lo; v <= hi; v += step) yTicks.push({ v, y: Y(v) });
 
@@ -277,40 +276,13 @@ function lineChart(opts) {
 
   document.getElementById(opts.chartEl).innerHTML =
     `<svg viewBox="0 0 ${W} ${H}" role="img">
-      ${gridAndAxis(sc, H, MB, yTicks, v => v)}
+      ${gridAndAxis(sc, H, MB, yTicks, yFmt)}
       <line x1="${ML}" x2="${W - MR}" y1="${Y(baseline)}" y2="${Y(baseline)}" stroke="var(--axis)" stroke-width="1" stroke-dasharray="4 3"/>
       ${paths}${flows}
       <line class="crosshair" y1="${MT}" y2="${H - MB}" stroke="var(--ink-muted)" stroke-width="1" style="display:none"/>
       <circle class="hoverdot" r="4" fill="var(--series-1)" stroke="var(--surface-1)" stroke-width="2" style="display:none"/>
     </svg>`;
   attachHover(opts.cardId, opts.tipId, sc, H, i => opts.tooltip(i, Y));
-}
-
-function underwaterChart(opts) {
-  const H = 240, MB = 26;
-  const sc = mkScale(opts.dts);
-  const dmin = Math.floor(Math.min(...opts.dd) / 5) * 5;
-  const Y = v => MT + (0 - v) / (0 - dmin) * (H - MT - MB);
-  const yTicks = [];
-  const step = dmin < -50 ? 20 : 10;
-  for (let v = 0; v >= dmin; v -= step) yTicks.push({ v, y: Y(v) });
-  let area = `M${sc.X(0).toFixed(1)} ${Y(0).toFixed(1)}`;
-  for (let i = 0; i < sc.n; i++) area += `L${sc.X(i).toFixed(1)} ${Y(opts.dd[i]).toFixed(1)}`;
-  area += `L${sc.X(sc.n - 1).toFixed(1)} ${Y(0).toFixed(1)}Z`;
-  document.getElementById(opts.chartEl).innerHTML =
-    `<svg viewBox="0 0 ${W} ${H}" role="img">
-      ${gridAndAxis(sc, H, MB, yTicks, v => v + "%")}
-      <path d="${area}" fill="var(--dd-red)" opacity="0.16"/>
-      <path d="${pathOf(opts.dd, sc, Y)}" fill="none" stroke="var(--dd-red)" stroke-width="2" stroke-linejoin="round"/>
-      <line class="crosshair" y1="${MT}" y2="${H - MB}" stroke="var(--ink-muted)" stroke-width="1" style="display:none"/>
-      <circle class="hoverdot" r="4" fill="var(--dd-red)" stroke="var(--surface-1)" stroke-width="2" style="display:none"/>
-    </svg>`;
-  attachHover(opts.cardId, opts.tipId, sc, H, i => {
-    const v = opts.dd[i];
-    let html = `<div class="t-date">${opts.dts[i]}</div><div class="t-val neg-txt">${v.toFixed(1)}%</div>`;
-    if (opts.holdings) html += `<div style="color:var(--ink-2);margin-top:4px;max-width:250px;line-height:1.5">Holdings: ${opts.holdings[i] || "(none)"}</div>`;
-    return [Y(v), html];
-  });
 }
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -350,9 +322,10 @@ function heatmap(elId, monthly) {
     `<div style="overflow-x:auto"><svg viewBox="0 0 ${Wh} ${Hh}" style="min-width:760px" role="img">${g}</svg></div>`;
 }
 
-function ddTable(tableId, eps) {
+function ddTable(tableId, eps, cur) {
+  const money = v => v.toLocaleString("en-US", {maximumFractionDigits: 0});
   document.querySelector(`#${tableId} tbody`).innerHTML = eps.map((e, i) =>
-    `<tr><td>${i + 1}</td><td class="neg-txt">${e.depth.toFixed(1)}%</td>` +
+    `<tr><td>${i + 1}</td><td class="neg-txt">${money(e.depth)} ${cur}</td>` +
     `<td>${e.peak}</td><td>${e.trough}</td><td>${e.recovered ?? "not yet"}</td>` +
     `<td>${e.days_down}</td><td>${e.days_total ?? "—"}</td></tr>`).join("");
 }
@@ -379,73 +352,65 @@ function rollingChart(prefix, dts, roll, bench, benchName) {
 }
 
 // ================= US panel =================
+function xirrChart(prefix, xdates, series, bench, benchName) {
+  lineChart({
+    chartEl: `${prefix}-chart-xirr`, cardId: `${prefix}-card-xirr`, tipId: `${prefix}-tip-xirr`,
+    dts: xdates, H: 320, baseline: 0,
+    series: [
+      { arr: bench, stroke: "var(--ink-muted)", width: 1.5, opacity: 0.75 },
+      { arr: series, stroke: "var(--series-1)", width: 2 },
+    ],
+    tooltip: (i, Y) => [Y(series[i]),
+      `<div class="t-date">${xdates[i]}</div><div class="t-val">XIRR ${pct(series[i])}/yr</div>` +
+      (bench[i] != null ? `<div style="color:var(--ink-2)">${benchName} ${pct(bench[i])}/yr</div>` : "")],
+  });
+}
+
 tiles("us-tiles", [
   ["Trailing 12M TWR", pct(lastNonNull(US.roll)), "NDX " + pct(lastNonNull(US.roll_bench)) + " same window"],
   ["Money-weighted (XIRR)", pct(US.xirr) + "/yr", "actual cash flows"],
-  ["Total return (since 2022-05)", pct(US.cfinal - 100), "TWR, full history"],
-  ["Current drawdown", US.cdd[US.cdd.length - 1].toFixed(1) + "%", "from " + US.ctop_dd[0].peak + " peak"],
 ]);
+function pnlChart(prefix, dts, mine, shadow, cur, holdings) {
+  const kFmt = v => Math.abs(v) >= 1000 ? (v / 1000).toFixed(0) + "k" : v;
+  const money = v => (v >= 0 ? "+" : "") + v.toLocaleString("en-US", {maximumFractionDigits: 0});
+  const hdr = document.getElementById(`${prefix}-pnl-vals`);
+  const setHdr = i => {
+    hdr.innerHTML = `<b>${money(mine[i])} ${cur}</b>&ensp;·&ensp;shadow ${money(shadow[i])}`;
+  };
+  setHdr(mine.length - 1);
+  lineChart({
+    chartEl: `${prefix}-chart-pnl`, cardId: `${prefix}-card-pnl`, tipId: `${prefix}-tip-pnl`,
+    dts, H: 340, baseline: 0, yFmt: kFmt,
+    series: [
+      { arr: shadow, stroke: "var(--ink-muted)", width: 1.5, opacity: 0.75 },
+      { arr: mine, stroke: "var(--series-1)", width: 2 },
+    ],
+    tooltip: (i, Y) => {
+      setHdr(i);
+      return [Y(mine[i]), `<div class="t-date">${dts[i]}</div>` +
+        `<div style="color:var(--ink-2);max-width:250px;line-height:1.5">${holdings[i] || "(no position)"}</div>`];
+    },
+  });
+  document.querySelector(`#${prefix}-chart-pnl svg`)
+    .addEventListener("mouseleave", () => setHdr(mine.length - 1));
+}
+
 rollingChart("us", US.cdates, US.roll, US.roll_bench, "NDX");
-lineChart({
-  chartEl: "us-chart-index", cardId: "us-card-index", tipId: "us-tip-index",
-  dts: US.cdates, flows: US.cflows,
-  series: [
-    { arr: US.cndx, stroke: "var(--ink-muted)", width: 1.5, opacity: 0.75 },
-    { arr: US.cindex, stroke: "var(--series-1)", width: 2 },
-  ],
-  tooltip: (i, Y) => {
-    const v = US.cindex[i], ret = (v / 100 - 1) * 100, ndx = US.cndx[i];
-    return [Y(v), `<div class="t-date">${US.cdates[i]}</div><div class="t-val">Index ${v.toFixed(1)}</div>` +
-      `<div style="color:var(--ink-2)">Cum. ${pct(ret)}</div>` +
-      (ndx != null ? `<div style="color:var(--ink-2)">NDX ${ndx.toFixed(1)}</div>` : "") +
-      `<div style="color:var(--ink-2);margin-top:4px;max-width:230px;line-height:1.5">Holdings: ${US.choldings[i] || "(none)"}</div>`];
-  },
-});
-lineChart({
-  chartEl: "us-chart-deploy", cardId: "us-card-deploy", tipId: "us-tip-deploy",
-  dts: US.ddates, H: 340,
-  series: [
-    { arr: US.ndx_matched, stroke: "var(--ink-muted)", width: 1.5, opacity: 0.85 },
-    { arr: US.deploy, stroke: "var(--series-1)", width: 2 },
-  ],
-  tooltip: (i, Y) => {
-    const dv = US.deploy[i], nv = US.ndx_matched[i], gap = dv - nv;
-    return [Y(dv), `<div class="t-date">${US.ddates[i]}</div><div class="t-val">Deployed ${dv.toFixed(1)}</div>` +
-      `<div style="color:var(--ink-2)">NDX matched ${nv.toFixed(1)}</div>` +
-      `<div style="color:var(--ink-2)">Gap ${pct(gap)}</div>` +
-      `<div style="color:var(--ink-2);margin-top:4px;max-width:230px;line-height:1.5">Holdings: ${US.dholdings[i] || "(none)"}</div>`];
-  },
-});
-underwaterChart({ chartEl: "us-chart-dd", cardId: "us-card-dd", tipId: "us-tip-dd", dts: US.cdates, dd: US.cdd });
+xirrChart("us", US.xdates, US.xirr_series, US.xirr_bench, "NDX");
+pnlChart("us", US.ddates, US.pnl, US.shadow_pnl, "USD", US.dholdings);
 heatmap("us-chart-heat", US.cmonthly);
-ddTable("us-dd-table", US.ctop_dd);
+ddTable("us-dd-table", US.pnl_dd, "USD");
 
 // ================= TW panel =================
 tiles("tw-tiles", [
   ["Trailing 12M TWR", pct(lastNonNull(TW.roll)), "0050 " + pct(lastNonNull(TW.roll_bench)) + " same window"],
   ["Money-weighted (XIRR)", pct(TW.xirr) + "/yr", "per-trade cash flows"],
-  ["Total return (since 2019-01)", pct(TW.final - 100), "TWR, full history"],
-  ["Current drawdown", TW.drawdown[TW.drawdown.length - 1].toFixed(1) + "%", "from " + TW.top_dd[0].peak + " peak"],
 ]);
 rollingChart("tw", TW.dates, TW.roll, TW.roll_bench, "0050");
-lineChart({
-  chartEl: "tw-chart-index", cardId: "tw-card-index", tipId: "tw-tip-index",
-  dts: TW.dates,
-  series: [
-    { arr: TW.bench, stroke: "var(--ink-muted)", width: 1.5, opacity: 0.75 },
-    { arr: TW.index, stroke: "var(--series-1)", width: 2 },
-  ],
-  tooltip: (i, Y) => {
-    const v = TW.index[i], ret = (v / 100 - 1) * 100, b = TW.bench[i];
-    return [Y(v), `<div class="t-date">${TW.dates[i]}</div><div class="t-val">Index ${v.toFixed(1)}</div>` +
-      `<div style="color:var(--ink-2)">Cum. ${pct(ret)}</div>` +
-      (b != null ? `<div style="color:var(--ink-2)">0050 ${b.toFixed(1)}</div>` : "") +
-      `<div style="color:var(--ink-2);margin-top:4px;max-width:250px;line-height:1.5">Holdings: ${TW.holdings[i] || "(none)"}</div>`];
-  },
-});
-underwaterChart({ chartEl: "tw-chart-dd", cardId: "tw-card-dd", tipId: "tw-tip-dd", dts: TW.dates, dd: TW.drawdown, holdings: TW.holdings });
+xirrChart("tw", TW.xdates, TW.xirr_series, TW.xirr_bench, "0050");
+pnlChart("tw", TW.dates, TW.pnl, TW.shadow_pnl, "TWD", TW.holdings);
 heatmap("tw-chart-heat", TW.monthly);
-ddTable("tw-dd-table", TW.top_dd);
+ddTable("tw-dd-table", TW.pnl_dd, "TWD");
 </script>
 </body>
 </html>

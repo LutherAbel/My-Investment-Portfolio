@@ -203,9 +203,19 @@ assert ft_mv[days[-1]] < 1, "FT positions must be empty after ACAT"
 def sleeve_stock(d):
     return ft_mv.get(d, 0.0) + stock_mv.get(d, 0.0)
 
+def ndx_asof(d):
+    for k in range(10):
+        v = ndx_close.get(date.fromordinal(d.toordinal() - k).isoformat())
+        if v:
+            return v
+    return None
+
 ddates = [d.isoformat() for d in deploy_days]
 deploy_index, ndx_matched_index = [100.0], [100.0]
 di = ni = 100.0
+# dollar P&L vs matched-deployment index shadow: same buy dollars, same sell fractions
+pnl_series, shadow_pnl_series = [0.0], [0.0]
+shadow_units = cum_buys = cum_sells = shadow_cum_sells = 0.0
 for i in range(1, len(deploy_days)):
     dp, dc = deploy_days[i - 1], deploy_days[i]
     nb = sum(v for k, v in net_buys.items() if dp < k <= dc)
@@ -217,6 +227,18 @@ for i in range(1, len(deploy_days)):
             ni *= ndx_close[dc.isoformat()] / ndx_close[dp.isoformat()]
     deploy_index.append(round(di, 4))
     ndx_matched_index.append(round(ni, 4))
+
+    sells = gb - nb
+    px = ndx_asof(dc)
+    shadow_units += gb / px
+    f = sells / denom if denom > 1 else 0.0
+    f = min(max(f, 0.0), 1.0)
+    shadow_cum_sells += f * shadow_units * px
+    shadow_units *= 1 - f
+    cum_buys += gb
+    cum_sells += sells
+    pnl_series.append(round(sleeve_stock(dc) + cum_sells - cum_buys, 2))
+    shadow_pnl_series.append(round(shadow_units * px + shadow_cum_sells - cum_buys, 2))
 
 ib_hold_by_date = dict(zip(days[start_i:], holdings_by_day))
 dholdings = []
@@ -303,6 +325,34 @@ for d, r in cret_by_day.items():
     cmonthly[(d.year, d.month)] *= 1 + r
 cmonthly_out = [{"y": y, "m": m, "ret": round((v - 1) * 100, 2)} for (y, m), v in sorted(cmonthly.items())]
 
+def dollar_episodes(pnl, dts):
+    # drawdown episodes on the cumulative dollar P&L curve; depth in currency
+    eps, p, t, in_dd = [], 0, 0, False
+    for i in range(1, len(pnl)):
+        if pnl[i] >= pnl[p]:
+            if in_dd:
+                eps.append((p, t, i))
+                in_dd = False
+            p = t = i
+        else:
+            in_dd = True
+            if pnl[i] < pnl[t]:
+                t = i
+    if in_dd:
+        eps.append((p, t, None))
+    out = []
+    for p, t, rcv in eps:
+        out.append({
+            "depth": round(pnl[t] - pnl[p], 2),
+            "peak": dts[p], "trough": dts[t],
+            "recovered": dts[rcv] if rcv is not None else None,
+            "days_down": (date.fromisoformat(dts[t]) - date.fromisoformat(dts[p])).days,
+            "days_total": (date.fromisoformat(dts[rcv]) - date.fromisoformat(dts[p])).days if rcv is not None else None,
+        })
+    out.sort(key=lambda e: e["depth"])
+    return out
+
+
 def episodes(ix, dts):
     eps, p, t, in_dd = [], 0, 0, False
     for i in range(1, len(ix)):
@@ -368,6 +418,31 @@ def xirr(flows):
 xf = sorted([(k, -v) for k, v in c_flow.items() if abs(v) > 0.01] + [(days[-1], nav[days[-1]])])
 xirr_pct = round(xirr(xf) * 100, 2)
 
+# XIRR through time: at each sample date, all flows so far + that day's value as terminal.
+# Benchmark: the same external deposits/withdrawals routed into NDX (account-level shadow).
+flow_items = sorted((k, -v) for k, v in c_flow.items() if abs(v) > 0.01)
+sh_units = 0.0
+fi_ = 0
+us_shadow_val = {}
+ext_flows = sorted((k, v) for k, v in c_flow.items() if abs(v) > 0.01)
+for d in combined_days:
+    while fi_ < len(ext_flows) and ext_flows[fi_][0] <= d:
+        k, v = ext_flows[fi_]
+        sh_units += v / ndx_asof(k)
+        fi_ += 1
+    us_shadow_val[d] = sh_units * ndx_asof(d)
+
+xdates, xirr_series, xirr_bench = [], [], []
+first_d = combined_days[0]
+for i, d in enumerate(combined_days):
+    if (d - first_d).days < 365:
+        continue
+    if d < ib_start or i % 5 == 0 or i == len(combined_days) - 1:   # monthly nodes + weekly samples
+        past = [(k, a) for k, a in flow_items if k <= d]
+        xdates.append(d.isoformat())
+        xirr_series.append(round(xirr(past + [(d, combined_nav(d))]) * 100, 2))
+        xirr_bench.append(round(xirr(past + [(d, us_shadow_val[d])]) * 100, 2))
+
 out = {
     "asof": days[-1].isoformat(),
     "validation": validation,
@@ -378,6 +453,9 @@ out = {
     "ddates": ddates, "deploy": deploy_index, "ndx_matched": ndx_matched_index,
     "dholdings": dholdings,
     "roll": roll, "roll_bench": roll_bench, "xirr": xirr_pct,
+    "xdates": xdates, "xirr_series": xirr_series, "xirr_bench": xirr_bench,
+    "pnl": pnl_series, "shadow_pnl": shadow_pnl_series,
+    "pnl_dd": dollar_episodes(pnl_series, ddates)[:5],
 }
 json.dump(out, open(rf"{DATA}\twr_data.json", "w"))
 print("validation:", [(v["year"], v["diff"]) for v in validation])
